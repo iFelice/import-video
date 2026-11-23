@@ -25,7 +25,7 @@ pagine_indice = [
 ]
 
 FILE_STORICO = "storico_estratti.txt"
-FILE_PLAYLIST = "playlist.m3u"
+FILE_PLAYLIST = "playlist.m3u8"
 
 session = requests.Session()
 session.headers.update({
@@ -77,7 +77,7 @@ for i, pagina in enumerate(pagine_indice):
 
 print(f"\nTotale nuovi link da analizzare: {len(nuovi_link_da_estrarre)}\n")
 
-# FASE 2: Estrae il flusso .m3u8
+# FASE 2: Estrae il flusso .8
 nuovi_video = []
 pattern_m3u8 = re.compile(r'["\'](https?://[^"\']+/hls/[^"\']+\.m3u8[^"\']*)["\']')
 pattern_m3u8_fallback = re.compile(r'["\'](https?://[^"\']+\.m3u8[^"\']*)["\']')
