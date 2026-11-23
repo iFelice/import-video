@@ -4,9 +4,9 @@ import time
 import random
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, parse_qs
 
-# 1. Inserisci qui gli URL esatti delle pagine indice / categoria
+# 1. Inserisci qui gli URL esatti (copia dalla barra del browser anche per Pagina 2 e 3 della ricerca!)
 pagine_indice = [
     "https://porn4days.pw/search/?s=carolina+guerrero",
     "https://porn4days.pw/search/page2/?s=carolina+guerrero",
@@ -17,8 +17,15 @@ FILE_STORICO = "storico_carolina_guerrero.txt"
 FILE_PLAYLIST = "carolina_guerrero.m3u8"
 
 def ricava_categoria_da_url(url):
-    """Estrae un nome categoria pulito dall'URL (es. '/nuovi-video/page2/' -> 'Nuovi Video')"""
-    percorso = urlparse(url).path.strip("/")
+    """Estrae la categoria dal percorso URL oppure dal parametro di ricerca ?s=..."""
+    parsed = urlparse(url)
+    parametri = parse_qs(parsed.query)
+    
+    # Se è una pagina di ricerca (?s=fred+flistones), usa la chiave di ricerca come gruppo
+    if "s" in parametri and parametri["s"]:
+        return parametri["s"].replace("+", " ").strip().title()
+        
+    percorso = parsed.path.strip("/")
     if not percorso:
         return "Home"
     parti = [p for p in percorso.split("/") if not re.match(r'^page[-_]?\d+$', p, re.IGNORECASE)]
@@ -41,7 +48,7 @@ if os.path.exists(FILE_STORICO):
 nuovi_link_da_estrarre = []
 link_visti_in_questa_sessione = set()
 
-# FASE 1: Trova i link dalle anteprime, copertina e categoria
+# FASE 1: Trova i link dalle anteprime
 for idx_pag, pagina in enumerate(pagine_indice, start=1):
     try:
         parsed = urlparse(pagina)
@@ -52,7 +59,7 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
         print(f"Controllo: {pagina} [Gruppo: {gruppo_categoria}] (HTTP: {risposta.status_code})")
         
         soup = BeautifulSoup(risposta.text, "html.parser")
-        trovati_pagina = 0
+        trovati_pagina = []
         
         for link in soup.find_all("a", href=True):
             img_tag = link.find("img")
@@ -64,28 +71,33 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
                     or ""
                 )
                 
-                # Salta il logo/favicon del sito (es. row 0 del tuo test)
                 if "favicon" in raw_logo.lower() or "graphics/" in raw_logo.lower():
                     continue
                 
-                href_pulito = link["href"].lstrip("/")
-                url_completo = urljoin(base_url, href_pulito)
+                href_originale = link["href"].strip()
+                # Se il link inizia con '../' usa urljoin con la pagina corrente per risalire correttamente,
+                # altrimenti unisce direttamente al dominio principale (base_url)
+                if href_originale.startswith(".."):
+                    url_completo = urljoin(pagina, href_originale)
+                else:
+                    url_completo = urljoin(base_url, href_originale.lstrip("/"))
                 
-                # Salta eventuali link che puntano semplicemente alla homepage
                 if url_completo.rstrip("/") == base_url.rstrip("/"):
                     continue
                 
                 if url_completo not in gia_estratti and url_completo not in link_visti_in_questa_sessione:
-                    trovati_pagina += 1
                     link_visti_in_questa_sessione.add(url_completo)
+                    trovati_pagina.append(url_completo)
                     
-                    # Risolve correttamente anche i percorsi con '../img2/...'
                     logo_url = urljoin(pagina, raw_logo) if raw_logo and not raw_logo.startswith("data:") else ""
-                    tvg_id = f"p{idx_pag}v{trovati_pagina}"
+                    tvg_id = f"p{idx_pag}v{len(trovati_pagina)}"
                     
                     nuovi_link_da_estrarre.append((url_completo, pagina, tvg_id, logo_url, gruppo_categoria))
                     
-        print(f" -> Nuovi link trovati: {trovati_pagina}")
+        print(f" -> Nuovi link trovati: {len(trovati_pagina)}")
+        if trovati_pagina:
+            print(f"    (Esempio URL costruito: {trovati_pagina})")
+            
         if idx_pag < len(pagine_indice):
             time.sleep(random.uniform(2.0, 3.5))
     except Exception as e:
@@ -145,7 +157,7 @@ with open(FILE_STORICO, "w", encoding="utf-8") as f:
     for url in sorted(gia_estratti):
         f.write(f"{url}\n")
 
-# FASE 3: Accoda i nuovi video alla playlist con tutti gli attributi #EXTINF
+# FASE 3: Accoda i nuovi video alla playlist
 if nuovi_video:
     playlist_esistente = os.path.exists(FILE_PLAYLIST)
     with open(FILE_PLAYLIST, "a", encoding="utf-8") as f:
@@ -153,6 +165,9 @@ if nuovi_video:
             f.write("#EXTM3U\n")
         for tvg_id, logo_url, gruppo, titolo, flusso in nuovi_video:
             f.write(f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-logo="{logo_url}" group-title="{gruppo}",{titolo}\n')
+            f.write(f"{flusso}\n")
+
+print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
             f.write(f"{flusso}\n")
 
 print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
