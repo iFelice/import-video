@@ -1,0 +1,38 @@
+name: Aggiorna Playlist Video
+
+on:
+  schedule:
+    # Esegue lo script ogni giorno alle 07:00 UTC (08:00 ora italiana)
+    - cron: '0 7 * * *'
+  workflow_dispatch: # Aggiunge il pulsante per avviarlo manualmente quando vuoi
+
+permissions:
+  contents: write # Permette a GitHub di salvare i file aggiornati nel repository
+
+jobs:
+  estrai:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Scarica i file del repository
+        uses: actions/checkout@v4
+
+      - name: Configura Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installa librerie
+        run: pip install -r requirements.txt
+
+      - name: Esegui lo script di estrazione
+        run: python estrai_video.py
+
+      - name: Salva playlist e storico aggiornati
+        run: |
+          git config --local user.email "github-actions[bot]@://github.com"
+          git config --local user.name "github-actions[bot]"
+          git add playlist.m3u storico_estratti.txt
+          git commit -m "Aggiornamento automatico playlist" || exit 0
+          git push
+.github/workflows/aggiorna.yml.github/workflows/aggiorna.yml
