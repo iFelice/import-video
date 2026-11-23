@@ -2,8 +2,8 @@ name: Aggiorna Playlist Video
 
 on:
   schedule:
-    # Esegue lo script ogni giorno alle 07:00 UTC (08:00 ora italiana)
-    - cron: '0 7 * * *'
+    # Esegue alle 08:00, 14:00, 18:00 e 22:00 ora italiana (UTC+1)
+    - cron: '0 7,13,17,21 * * *'
   workflow_dispatch: # Aggiunge il pulsante per avviarlo manualmente quando vuoi
 
 permissions:
