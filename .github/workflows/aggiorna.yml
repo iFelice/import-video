@@ -35,4 +35,3 @@ jobs:
           git add playlist.m3u storico_estratti.txt
           git commit -m "Aggiornamento automatico playlist" || exit 0
           git push
-.github/workflows/aggiorna.yml.github/workflows/aggiorna.yml
