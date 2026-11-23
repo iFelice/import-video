@@ -18,7 +18,6 @@ pagine_indice = [
     "https://porn4days.pw/newest/page8/",
     "https://porn4days.pw/newest/page9/",
     "https://porn4days.pw/newest/page10/",
-    "https://porn4days.pw/newest/page10/",
     "https://porn4days.pw/newest/page11/",
     "https://porn4days.pw/newest/page12/",
     "https://porn4days.pw/newest/page13/",
