@@ -32,6 +32,6 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@://github.com"
           git config --local user.name "github-actions[bot]"
-          git add playlist.m3u storico_estratti.txt
+          git add playlist.m3u8 storico_estratti.txt
           git commit -m "Aggiornamento automatico playlist" || exit 0
           git push
