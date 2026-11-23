@@ -25,13 +25,17 @@ jobs:
       - name: Installa librerie
         run: pip install -r requirements.txt
 
-      - name: Esegui lo script di estrazione
-        run: python estrai_video.py
+      - name: Esegui tutti gli script Python presenti
+        run: |
+          for script in *.py; do
+            echo "Avvio $script..."
+            python "$script"
+          done
 
       - name: Salva playlist e storico aggiornati
         run: |
           git config --local user.email "github-actions[bot]@://github.com"
           git config --local user.name "github-actions[bot]"
-          git add playlist.m3u8 storico_estratti.txt
+          git add *.m3u8 *.txt
           git commit -m "Aggiornamento automatico playlist" || exit 0
           git push
