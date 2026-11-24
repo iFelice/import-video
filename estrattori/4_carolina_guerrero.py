@@ -76,7 +76,6 @@ def verifica_flusso_reale(url_flusso, referer, durata_target=None):
     headers_str = f"Referer: {referer}\r\nOrigin: {origin}\r\n"
 
     try:
-        # Pre-controllo rapido HTTP per scartare subito falsi .m3u8 (es. pagine HTML 403/404)
         if ".m3u8" in url_flusso.lower():
             r = session.get(url_flusso, headers={"Referer": referer, "Origin": origin}, timeout=10)
             if r.status_code != 200 or "#EXTM3U" not in r.text[:200]:
@@ -101,10 +100,11 @@ def verifica_flusso_reale(url_flusso, referer, durata_target=None):
         ha_video = any(s.get("codec_type") == "video" for s in dati.get("streams", []))
         durata = float(dati.get("format", {}).get("duration", 0))
 
-        if not ha_video or durata < DURATA_MINIMA_ASSOLUTA:
+        # Se durata == 0 (tipico di alcuni .m3u8), lasciamo passare; scartiamo solo se > 0 ma troppo corto
+        if not ha_video or (0 < durata < DURATA_MINIMA_ASSOLUTA):
             return False
-        if durata_target and durata_target > DURATA_MINIMA_ASSOLUTA:
-            tolleranza = max(120, durata_target * 0.20)
+        if durata > 0 and durata_target and durata_target > DURATA_MINIMA_ASSOLUTA:
+            tolleranza = max(120, durata_target * 0.25)
             if abs(durata - durata_target) > tolleranza:
                 return False
 
@@ -125,7 +125,7 @@ def verifica_flusso_reale(url_flusso, referer, durata_target=None):
 
 pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+)["\']', re.IGNORECASE)
 pat_flussi = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
-parole_pub = ("ads", "vast", "preroll", "banner", "doubleclick", "googleads", "promo", "spot")
+parole_pub = ("ads", "vast", "preroll", "banner", "doubleclick", "googleads")
 
 
 def estrai_flussi_da_pagina(html_text, soup, base_url):
@@ -168,7 +168,7 @@ def cerca_su_siti_alternativi_veloce(titolo_grezzo, durata_target):
                         u_res = urljoin(url_ric, a["href"].strip())
                         if urlparse(u_res).path != "/" and u_res != url_ric and u_res not in risultati:
                             risultati.append(u_res)
-                            if len(risultati) >= 3:
+                            if len(risultati) >= 2:
                                 break
                 for u_video_alt in risultati:
                     r_v = session.get(u_video_alt, headers={"Referer": url_ric}, timeout=15)
@@ -177,11 +177,14 @@ def cerca_su_siti_alternativi_veloce(titolo_grezzo, durata_target):
                     for _, link_flusso in candidati:
                         if verifica_flusso_reale(link_flusso, u_video_alt, durata_target):
                             return parsed_alt.netloc, link_flusso, u_video_alt
-                    time.sleep(0.8)
+                    time.sleep(0.5)
+                # Se la prima query ha già restituito risultati sulla pagina, evitiamo la seconda query corta
+                if risultati:
+                    break
             except Exception:
                 continue
     return None, None, None
- 
+    # --- ESECUZIONE PRINCIPALE ---
 gia_estratti = set()
 if os.path.exists(FILE_STORICO):
     with open(FILE_STORICO, "r", encoding="utf-8") as f:
@@ -213,7 +216,7 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
                     nuovi_link.append((url_completo, pagina, f"p{idx_pag}v{trovati}", logo, gruppo))
         print(f"Pagina {idx_pag} [{gruppo}]: {trovati} nuovi link")
         if idx_pag < len(pagine_indice):
-            time.sleep(random.uniform(1.5, 2.5))
+            time.sleep(random.uniform(1.0, 1.8))
     except Exception as e:
         print(f"Errore pagina {pagina}: {e}")
 
@@ -246,13 +249,13 @@ for url_video, pag_orig, tvg_id, logo_url, gruppo in nuovi_link:
 
         if link_ok:
             nuovi_video.append((tvg_id, logo_url, gruppo, titolo, link_ok, ref_vlc))
+            gia_estratti.add(url_video)
             print(f"[OK - {srv_ok}] {titolo}")
         else:
             mancanti.append((gruppo, logo_url, titolo, url_video))
             print(f"[DA RECUPERARE] {titolo}")
 
-        gia_estratti.add(url_video)
-        time.sleep(random.uniform(0.8, 1.5))
+        time.sleep(random.uniform(0.5, 1.0))
     except Exception as e:
         print(f"Errore su {url_video}: {e}")
 
@@ -261,9 +264,16 @@ with open(FILE_STORICO, "w", encoding="utf-8") as f:
         f.write(f"{u}\n")
 
 if mancanti:
+    gia_mancanti = set()
+    if os.path.exists(FILE_MANCANTI):
+        with open(FILE_MANCANTI, "r", encoding="utf-8") as f:
+            gia_mancanti = {r.strip() for r in f if r.strip()}
     with open(FILE_MANCANTI, "a", encoding="utf-8") as f:
         for grp, logo, tit, u_orig in mancanti:
-            f.write(f"TITOLO: {tit} | GRUPPO: {grp} | LOGO: {logo} | ORIGINE: {u_orig}\n")
+            riga = f"TITOLO: {tit} | GRUPPO: {grp} | LOGO: {logo} | ORIGINE: {u_orig}"
+            if riga not in gia_mancanti:
+                f.write(f"{riga}\n")
+                gia_mancanti.add(riga)
 
 if nuovi_video:
     esiste = os.path.exists(FILE_PLAYLIST) and os.path.getsize(FILE_PLAYLIST) > 0
