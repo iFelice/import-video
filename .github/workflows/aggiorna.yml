@@ -54,7 +54,7 @@ jobs:
 
       - name: Salva playlist e storici aggiornati
         run: |
-          git config --local user.email "41898282+github-actions[bot]@://github.com"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add output_m3u8/*.m3u8 archivio_storico/*.txt
           git commit -m "Aggiornamento automatico playlist" || exit 0
@@ -67,7 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           AUTH="Authorization: Bearer $GIST_TOKEN"
-          OWNER=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://github.com" | jq -r '.owner.login')
+          OWNER=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://api.github.com/gists/$GIST_ID" | jq -r '.owner.login')
           if [ -z "$OWNER" ] || [ "$OWNER" = "null" ]; then
             echo "Gist non leggibile: controlla GIST_ID e GIST_TOKEN"
             exit 1
@@ -82,7 +82,7 @@ jobs:
             fi
             nome=$(basename "$file")
             payload=$(jq --arg n "$nome" --rawfile c "$file" '.files[$n] = {content: $c}' <<< "$payload")
-            indice+="https://githubusercontent.com"$'\n'
+            indice+="https://gist.githubusercontent.com/$OWNER/$GIST_ID/raw/$nome"$'\n'
           done
           if [ -z "$indice" ]; then
             echo "::warning::Nessuna lista con voci: non pubblico e lascio il Gist com'è"
@@ -91,7 +91,7 @@ jobs:
           payload=$(jq --arg c "$indice" '.files["indice.txt"] = {content: $c}' <<< "$payload")
           printf '%s' "$payload" | curl -sS -f -X PATCH \
             -H "$AUTH" -H "Accept: application/vnd.github+json" \
-            "https://github.com" -d @- > /dev/null
+            "https://api.github.com/gists/$GIST_ID" -d @- > /dev/null
           echo "Indice pubblicato:"
           printf '%s' "$indice"
 
