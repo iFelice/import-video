@@ -1,4 +1,4 @@
-mport os, re, time, random, subprocess, requests
+import os, re, time, random, subprocess, requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs, quote_plus
 from playwright.sync_api import sync_playwright
