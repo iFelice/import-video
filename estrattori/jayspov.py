@@ -22,8 +22,11 @@ SITI_ALTERNATIVI = [
     "https://horny69.com/search?q={query}",
 ]
 
-FILE_STORICO = "storico_jayspov.txt"
-FILE_PLAYLIST = "jayspov.m3u8"
+FILE_STORICO = "archivio_storico/jayspov.txt"
+FILE_PLAYLIST = "output_m3u8/jayspov.m3u8"
+
+os.makedirs("archivio_storico", exist_ok=True)
+os.makedirs("output_m3u8", exist_ok=True)
 
 def ricava_categoria_da_url(url):
     parsed = urlparse(url)
