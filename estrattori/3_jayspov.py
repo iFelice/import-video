@@ -131,7 +131,7 @@ def trova_server(html_text, soup_video, url_pagina):
             return nome, link
     return None, None
     def cerca_con_playwright(page, titolo_ricerca):
-    query = quote_plus(titolo_ricerca)
+        query = quote_plus(titolo_ricerca)
     js_find = "() => { for (const a of document.querySelectorAll('a[href]')) { if (a.querySelector('img') && !a.href.includes('logo') && a.href !== window.location.href) return a.href; } return null; }"
     for template in SITI_ALTERNATIVI:
         url_ric = template.format(query=query)
