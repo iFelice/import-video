@@ -2,7 +2,8 @@ name: Aggiorna Playlist Video
 
 on:
   schedule:
-    - cron: '0 6,16 * * *'
+    # 08:00, 14:00, 18:00 e 22:00 ora solare italiana (UTC+1)
+    - cron: '0 7,13,17,21 * * *'
   workflow_dispatch:
 
 permissions:
@@ -32,14 +33,19 @@ jobs:
       - name: Installa librerie Python
         run: pip install -r requirements.txt
 
+      - name: Installa browser Chromium per Playwright
+        run: playwright install --with-deps chromium
+
       - name: Esegui tutti gli script Python
         id: estrai
         continue-on-error: true
         run: |
+          mkdir -p output_m3u8 archivio_storico
           errori=0
           for script in estrattori/*.py; do
+            [ -e "$script" ] || continue
             echo "Avvio $script..."
-            if ! timeout 900 python "$script"; then
+            if ! timeout 1800 python "$script"; then
               echo "::error::Errore in $script"
               errori=1
             fi
@@ -48,7 +54,7 @@ jobs:
 
       - name: Salva playlist e storici aggiornati
         run: |
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.email "41898282+github-actions[bot]@://github.com"
           git config --local user.name "github-actions[bot]"
           git add output_m3u8/*.m3u8 archivio_storico/*.txt
           git commit -m "Aggiornamento automatico playlist" || exit 0
@@ -61,7 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           AUTH="Authorization: Bearer $GIST_TOKEN"
-          OWNER=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://api.github.com/gists/$GIST_ID" | jq -r '.owner.login')
+          OWNER=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://github.com" | jq -r '.owner.login')
           if [ -z "$OWNER" ] || [ "$OWNER" = "null" ]; then
             echo "Gist non leggibile: controlla GIST_ID e GIST_TOKEN"
             exit 1
@@ -76,7 +82,7 @@ jobs:
             fi
             nome=$(basename "$file")
             payload=$(jq --arg n "$nome" --rawfile c "$file" '.files[$n] = {content: $c}' <<< "$payload")
-            indice+="https://gist.githubusercontent.com/$OWNER/$GIST_ID/raw/$nome"$'\n'
+            indice+="https://githubusercontent.com"$'\n'
           done
           if [ -z "$indice" ]; then
             echo "::warning::Nessuna lista con voci: non pubblico e lascio il Gist com'è"
@@ -85,7 +91,7 @@ jobs:
           payload=$(jq --arg c "$indice" '.files["indice.txt"] = {content: $c}' <<< "$payload")
           printf '%s' "$payload" | curl -sS -f -X PATCH \
             -H "$AUTH" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/gists/$GIST_ID" -d @- > /dev/null
+            "https://github.com" -d @- > /dev/null
           echo "Indice pubblicato:"
           printf '%s' "$indice"
 
