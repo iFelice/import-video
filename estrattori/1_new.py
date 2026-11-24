@@ -21,7 +21,7 @@ pagine_indice = [
 
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 SITI_ALTERNATIVI = [
-    # Esempio: "https://sito-alternativo-1.com",
+    # "https://sito-alternativo-1.com{query}",
 ]
 
 FILE_STORICO = "archivio_storico/new.txt"
