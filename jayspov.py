@@ -5,32 +5,25 @@ from playwright.sync_api import sync_playwright
 
 # 1. Inserisci qui gli URL esatti (copia dalla barra del browser anche per Pagina 2 e 3 della ricerca!)
 pagine_indice = [
-    "https://porn4days.pw/search/?s=Dadcrush",
-    "https://porn4days.pw/search/page2/?s=Dadcrush",
-    "https://porn4days.pw/search/page3/?s=Dadcrush",
-    "https://porn4days.pw/search/page4/?s=Dadcrush",
-    "https://porn4days.pw/search/page5/?s=Dadcrush",
-    "https://porn4days.pw/search/page6/?s=Dadcrush",
-    "https://porn4days.pw/search/page7/?s=Dadcrush",
-    "https://porn4days.pw/search/page8/?s=Dadcrush",
-    "https://porn4days.pw/search/page9/?s=Dadcrush",
-    "https://porn4days.pw/search/page10/?s=Dadcrush",
-    "https://porn4days.pw/search/page11/?s=Dadcrush",
-    "https://porn4days.pw/search/page12/?s=Dadcrush",
-    "https://porn4days.pw/search/page13/?s=Dadcrush",
-    "https://porn4days.pw/search/page14/?s=Dadcrush",
-    "https://porn4days.pw/search/page15/?s=Dadcrush",
-    "https://porn4days.pw/search/page16/?s=Dadcrush",
+    "https://porn4days.pw/search/?s=jayspov",
+    "https://porn4days.pw/search/page2/?s=jayspov",
+    "https://porn4days.pw/search/page3/?s=jayspov",
+    "https://porn4days.pw/search/page4/?s=jayspov",
+    "https://porn4days.pw/search/page5/?s=jayspov",
+    "https://porn4days.pw/search/page6/?s=jayspov",
+    "https://porn4days.pw/search/page7/?s=jayspov",
+    "https://porn4days.pw/search/page8/?s=jayspov",
+    "https://porn4days.pw/search/page9/?s=jayspov",
 ]
 
 SITI_ALTERNATIVI = [
-    "https://sito-alternativo-1.com{query}",
-    "https://sito-alternativo-2.com{query}",
-    "https://sito-alternativo-3.com{query}",
+    "https://speedporn.net/xxxfree/?s={query}",
+    "https://bigfuck.tv/s/{query}",
+    "https://horny69.com/search?q={query}",
 ]
 
-FILE_STORICO = "storico_dadcrush.txt"
-FILE_PLAYLIST = "dadcrush.m3u8"
+FILE_STORICO = "storico_jayspov.txt"
+FILE_PLAYLIST = "jayspov.m3u8"
 
 def ricava_categoria_da_url(url):
     parsed = urlparse(url)
