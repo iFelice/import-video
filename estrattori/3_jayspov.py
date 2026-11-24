@@ -14,7 +14,6 @@ pagine_indice = [
     "https://porn4days.pw/search/page8/?s=jayspov",
     "https://porn4days.pw/search/page9/?s=jayspov",
 ]
-]
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 SITI_ALTERNATIVI = [
     "https://horny69.com/studios/jays-pov",
