@@ -32,7 +32,7 @@ jobs:
 
       - name: Esegui tutti gli script Python
         run: |
-          for script in *.py; do
+          for script in estrattori/*.py; do
             echo "Avvio $script..."
             python "$script"
           done
@@ -41,6 +41,6 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@://github.com"
           git config --local user.name "github-actions[bot]"
-          git add *.m3u8 *.txt
+          git add output_m3u8/*.m3u8 archivio_storico/*.txt
           git commit -m "Aggiornamento automatico playlist" || exit 0
           git push
