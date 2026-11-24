@@ -1,10 +1,7 @@
-import os
-import re
-import time
-import random
-import requests
+import os, re, time, random, requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, parse_qs, quote_plus
+from playwright.sync_api import sync_playwright
 
 # 1. Inserisci qui gli URL esatti delle pagine indice / categoria
 pagine_indice = [
@@ -23,21 +20,28 @@ pagine_indice = [
     "https://porn4days.pw/newest/page13/",
 ]
 
-FILE_STORICO = "storico_estratti.txt"
-FILE_PLAYLIST = "playlist.m3u8"
+FILE_STORICO = "archivio_storico/new.txt"
+FILE_PLAYLIST = "output_m3u8/new.m3u8"
+
+os.makedirs("archivio_storico", exist_ok=True)
+os.makedirs("output_m3u8", exist_ok=True)
 
 def ricava_categoria_da_url(url):
-    """Estrae un nome categoria pulito dall'URL (es. '/nuovi-video/page2/' -> 'Nuovi Video')"""
-    percorso = urlparse(url).path.strip("/")
+    parsed = urlparse(url)
+    parametri = parse_qs(parsed.query)
+    if "s" in parametri and parametri["s"]:
+        return parametri["s"][0].replace("+", " ").strip().title()
+    percorso = parsed.path.strip("/")
     if not percorso:
         return "Home"
-    # Divide i segmenti dell'URL ed esclude quelli relativi alla paginazione (es. page2, page-2, p2)
     parti = [p for p in percorso.split("/") if not re.match(r'^page[-_]?\d+$', p, re.IGNORECASE)]
-    if not parti:
-        return "Generale"
-    # Prende la categoria principale, sostituisce trattini/underscore con spazi e mette le maiuscole
-    categoria = parti[-1].replace("-", " ").replace("_", " ").strip().title()
-    return categoria
+    return parti[-1].replace("-", " ").replace("_", " ").strip().title() if parti else "Generale"
+
+def pulisci_titolo_per_ricerca(titolo_grezzo):
+    for sep in [" - ", " | ", " – ", " — "]:
+        if sep in titolo_grezzo:
+            titolo_grezzo = titolo_grezzo.split(sep)[0]
+    return titolo_grezzo.strip()
 
 session = requests.Session()
 session.headers.update({
@@ -51,111 +55,152 @@ if os.path.exists(FILE_STORICO):
     with open(FILE_STORICO, "r", encoding="utf-8") as f:
         gia_estratti = {riga.strip() for riga in f if riga.strip()}
 
-nuovi_link_da_estrarre = []
-link_visti_in_questa_sessione = set()
+nuovi_link, link_visti = [], set()
 
-# FASE 1: Trova i link dalle anteprime, copertina e categoria
 for idx_pag, pagina in enumerate(pagine_indice, start=1):
     try:
         parsed = urlparse(pagina)
         base_url = f"{parsed.scheme}://{parsed.netloc}/"
-        gruppo_categoria = ricava_categoria_da_url(pagina)
-        
+        gruppo_cat = ricava_categoria_da_url(pagina)
         risposta = session.get(pagina, timeout=15)
-        print(f"Controllo: {pagina} [Gruppo: {gruppo_categoria}] (HTTP: {risposta.status_code})")
-        
+        print(f"Controllo: {pagina} [Gruppo: {gruppo_cat}] (HTTP: {risposta.status_code})")
         soup = BeautifulSoup(risposta.text, "html.parser")
-        trovati_pagina = 0
-        
+        trovati = 0
         for link in soup.find_all("a", href=True):
             img_tag = link.find("img")
             if img_tag:
-                href_pulito = link["href"].lstrip("/")
-                url_completo = urljoin(base_url, href_pulito)
-                
-                if url_completo not in gia_estratti and url_completo not in link_visti_in_questa_sessione:
-                    trovati_pagina += 1
-                    link_visti_in_questa_sessione.add(url_completo)
-                    
-                    raw_logo = (
-                        img_tag.get("data-src")
-                        or img_tag.get("data-original")
-                        or img_tag.get("src")
-                        or ""
-                    )
-                    logo_url = urljoin(base_url, raw_logo.lstrip("/")) if raw_logo and not raw_logo.startswith("data:") else ""
-                    tvg_id = f"p{idx_pag}v{trovati_pagina}"
-                    
-                    nuovi_link_da_estrarre.append((url_completo, pagina, tvg_id, logo_url, gruppo_categoria))
-                    
-        print(f" -> Nuovi link trovati: {trovati_pagina}")
+                raw_logo = img_tag.get("data-src") or img_tag.get("data-original") or img_tag.get("src") or ""
+                if "favicon" in raw_logo.lower() or "graphics/" in raw_logo.lower():
+                    continue
+                href_orig = link["href"].strip()
+                url_completo = urljoin(pagina, href_orig) if href_orig.startswith("..") else urljoin(base_url, href_orig.lstrip("/"))
+                if url_completo.rstrip("/") == base_url.rstrip("/"):
+                    continue
+                if url_completo not in gia_estratti and url_completo not in link_visti:
+                    link_visti.add(url_completo)
+                    trovati += 1
+                    logo_url = urljoin(pagina, raw_logo) if raw_logo and not raw_logo.startswith("data:") else ""
+                    nuovi_link.append((url_completo, pagina, f"p{idx_pag}v{trovati}", logo_url, gruppo_cat))
+        print(f" -> Nuovi link trovati: {trovati}")
         if idx_pag < len(pagine_indice):
             time.sleep(random.uniform(2.0, 3.5))
     except Exception as e:
-        print(f"Errore pagina indice {pagina}: {e}")
+        print(f"Errore pagina {pagina}: {e}")
 
-print(f"\nTotale nuovi link da analizzare: {len(nuovi_link_da_estrarre)}\n")
+print(f"\nTotale nuovi link da analizzare: {len(nuovi_link)}\n")
 
-# FASE 2: Estrae il flusso .m3u8
-nuovi_video = []
-pattern_m3u8 = re.compile(r'["\'](https?://[^"\']+/hls/[^"\']+\.m3u8[^"\']*)["\']')
-pattern_m3u8_fallback = re.compile(r'["\'](https?://[^"\']+\.m3u8[^"\']*)["\']')
+pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+)["\']', re.IGNORECASE)
+pat_m3u8 = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
 
-def estrai_m3u8(html_text):
-    m = pattern_m3u8.search(html_text)
-    if m:
-        return m.group(1)
-    m2 = pattern_m3u8_fallback.search(html_text)
-    if m2:
-        return m2.group(1)
-    return None
-
-for url_video, pagina_origine, tvg_id, logo_url, gruppo_categoria in nuovi_link_da_estrarre:
+def verifica_link(url_flusso, referer):
     try:
-        res = session.get(url_video, headers={"Referer": pagina_origine}, timeout=15)
-        soup_video = BeautifulSoup(res.text, "html.parser")
-        
-        link_trovato = estrai_m3u8(res.text)
-        
-        if not link_trovato:
-            tag_hls = soup_video.find("hlsjs-video", src=True)
-            if tag_hls:
-                link_trovato = tag_hls["src"]
+        r = session.get(url_flusso, headers={"Referer": referer}, timeout=10, stream=True)
+        ok = (r.status_code == 200)
+        r.close()
+        return ok
+    except Exception:
+        return False
 
-        if link_trovato:
-            titolo = soup_video.title.string.strip() if soup_video.title else "Video"
-            titolo = " ".join(titolo.split()).replace(",", " -")
-            
-            if not logo_url:
-                og_img = soup_video.find("meta", property="og:image")
-                if og_img and og_img.get("content"):
-                    logo_url = og_img["content"]
-            
-            nuovi_video.append((tvg_id, logo_url, gruppo_categoria, titolo, link_trovato))
-            print(f"[OK] [{gruppo_categoria}] {tvg_id} | {titolo}")
+def trova_server(html_text, soup_video, url_pagina):
+    candidati, visti = [], set()
+    for nome, link in pat_srv.findall(html_text):
+        if link not in visti:
+            candidati.append((nome, link))
+            visti.add(link)
+    tag_hls = soup_video.find("hlsjs-video", src=True)
+    if tag_hls and tag_hls["src"] not in visti:
+        candidati.append(("HLSJS_TAG", tag_hls["src"]))
+        visti.add(tag_hls["src"])
+    for link in pat_m3u8.findall(html_text):
+        if link not in visti:
+            candidati.append(("FALLBACK_M3U8", link))
+            visti.add(link)
+    for nome, link in candidati:
+        if verifica_link(link, url_pagina):
+            return nome, link
+    return None, None
+
+def cerca_con_playwright(titolo_ricerca):
+    query = quote_plus(titolo_ricerca)
+    js_find = "() => { for (const a of document.querySelectorAll('a[href]')) { if (a.querySelector('img') && !a.href.includes('logo') && a.href !== window.location.href) return a.href; } return null; }"
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_context(user_agent=session.headers["User-Agent"]).new_page()
+        for template in SITI_ALTERNATIVI:
+            url_ric = template.format(query=query)
+            dom = urlparse(url_ric).netloc
+            print(f"   -> Cerco '{titolo_ricerca}' su {dom}...")
+            try:
+                page.goto(url_ric, wait_until="domcontentloaded", timeout=20000)
+                page.wait_for_timeout(2000)
+                primo = page.evaluate(js_find)
+                if not primo:
+                    continue
+                flusso = None
+                def on_resp(resp):
+                    nonlocal flusso
+                    if (".m3u8" in resp.url.lower() or ".mp4" in resp.url.lower()) and resp.status in (200, 206) and not flusso:
+                        flusso = resp.url
+                page.on("response", on_resp)
+                page.goto(primo, wait_until="domcontentloaded", timeout=20000)
+                page.wait_for_timeout(3000)
+                if not flusso:
+                    try:
+                        page.mouse.click(640, 360)
+                        page.wait_for_timeout(4000)
+                    except Exception:
+                        pass
+                page.remove_listener("response", on_resp)
+                if flusso:
+                    browser.close()
+                    return dom, flusso, primo
+            except Exception as e:
+                print(f"   -> Errore su {dom}: {e}")
+        browser.close()
+    return None, None, None
+
+nuovi_video = []
+for url_video, pag_orig, tvg_id, logo_url, gruppo in nuovi_link:
+    try:
+        res = session.get(url_video, headers={"Referer": pag_orig}, timeout=15)
+        soup_v = BeautifulSoup(res.text, "html.parser")
+        titolo_raw = soup_v.title.string.strip() if soup_v.title else "Video"
+        titolo = " ".join(titolo_raw.split()).replace(",", " -")
+        if not logo_url:
+            og = soup_v.find("meta", property="og:image")
+            if og and og.get("content"):
+                logo_url = og["content"]
+        srv, link_ok = trova_server(res.text, soup_v, url_video)
+        ref_vlc = None
+        if not link_ok and SITI_ALTERNATIVI:
+            tit_clean = pulisci_titolo_per_ricerca(titolo)
+            print(f"[FALLBACK] '{tit_clean}' -> Avvio Playwright...")
+            dom, link_ok, ref_vlc = cerca_con_playwright(tit_clean)
+            if link_ok:
+                srv = f"ALT:{dom}"
+        if link_ok:
+            nuovi_video.append((tvg_id, logo_url, gruppo, titolo, link_ok, ref_vlc))
+            print(f"[OK - {srv}] [{gruppo}] {tvg_id} | {titolo}")
             gia_estratti.add(url_video)
         else:
-            titolo_err = soup_video.title.string.strip() if soup_video.title else "Nessun titolo"
-            print(f"[NESSUN FLUSSO] {url_video} (Titolo: {titolo_err})")
-            
+            print(f"[FALLITO OVUNQUE] {url_video} (Titolo: {titolo})")
         time.sleep(random.uniform(1.5, 2.5))
-            
     except Exception as e:
         print(f"Errore su {url_video}: {e}")
 
-# Aggiorna storico
 with open(FILE_STORICO, "w", encoding="utf-8") as f:
-    for url in sorted(gia_estratti):
-        f.write(f"{url}\n")
+    for u in sorted(gia_estratti):
+        f.write(f"{u}\n")
 
-# FASE 3: Accoda i nuovi video alla playlist con tutti gli attributi #EXTINF
 if nuovi_video:
-    playlist_esistente = os.path.exists(FILE_PLAYLIST)
+    esiste = os.path.exists(FILE_PLAYLIST)
     with open(FILE_PLAYLIST, "a", encoding="utf-8") as f:
-        if not playlist_esistente:
+        if not esiste:
             f.write("#EXTM3U\n")
-        for tvg_id, logo_url, gruppo, titolo, flusso in nuovi_video:
-            f.write(f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-logo="{logo_url}" group-title="{gruppo}",{titolo}\n')
-            f.write(f"{flusso}\n")
+        for tid, logo, grp, tit, fls, ref in nuovi_video:
+            f.write(f'#EXTINF:-1 tvg-id="{tid}" tvg-logo="{logo}" group-title="{grp}",{tit}\n')
+            if ref:
+                f.write(f"#EXTVLCOPT:http-referrer={ref}\n")
+            f.write(f"{fls}\n")
 
 print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
