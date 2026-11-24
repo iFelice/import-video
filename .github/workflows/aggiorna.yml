@@ -25,6 +25,9 @@ jobs:
       - name: Installa librerie
         run: pip install -r requirements.txt
 
+      - name: Installa browser Chromium per Playwright
+        run: playwright install --with-deps chromium
+
       - name: Esegui tutti gli script Python presenti
         run: |
           for script in *.py; do
