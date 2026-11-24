@@ -2,15 +2,20 @@ name: Aggiorna Playlist Video
 
 on:
   schedule:
-    - cron: '0 7,13,17,21 * * *'
+    - cron: '0 6,16 * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: aggiorna-playlist
+  cancel-in-progress: false
+
 jobs:
   estrai:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Scarica i file del repository
@@ -31,15 +36,22 @@ jobs:
         run: playwright install --with-deps chromium
 
       - name: Esegui tutti gli script Python
+        id: estrai
+        continue-on-error: true
         run: |
+          errori=0
           for script in estrattori/*.py; do
             echo "Avvio $script..."
-            python "$script"
+            if ! timeout 900 python "$script"; then
+              echo "::error::Errore in $script"
+              errori=1
+            fi
           done
+          exit $errori
 
       - name: Salva playlist e storici aggiornati
         run: |
-          git config --local user.email "github-actions[bot]@://github.com"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add output_m3u8/*.m3u8 archivio_storico/*.txt
           git commit -m "Aggiornamento automatico playlist" || exit 0
@@ -70,8 +82,8 @@ jobs:
             indice+="https://gist.githubusercontent.com/$OWNER/$GIST_ID/raw/$nome"$'\n'
           done
           if [ -z "$indice" ]; then
-            echo "Nessuna lista valida: non pubblico"
-            exit 1
+            echo "::warning::Nessuna lista con voci: non pubblico e lascio il Gist com'è"
+            exit 0
           fi
           payload=$(jq --arg c "$indice" '.files["indice.txt"] = {content: $c}' <<< "$payload")
           printf '%s' "$payload" | curl -sS -f -X PATCH \
@@ -79,3 +91,9 @@ jobs:
             "https://api.github.com/gists/$GIST_ID" -d @- > /dev/null
           echo "Indice pubblicato:"
           printf '%s' "$indice"
+
+      - name: Segnala errori degli estrattori
+        if: steps.estrai.outcome == 'failure'
+        run: |
+          echo "Almeno un estrattore è fallito: le liste degli altri sono state salvate e pubblicate."
+          exit 1
