@@ -45,18 +45,37 @@ jobs:
           git commit -m "Aggiornamento automatico playlist" || exit 0
           git push
 
-      - name: Pubblica tutte le liste sul Gist
+      - name: Pubblica liste e indice sul Gist
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ vars.GIST_ID }}
         run: |
+          set -euo pipefail
+          AUTH="Authorization: Bearer $GIST_TOKEN"
+          OWNER=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://api.github.com/gists/$GIST_ID" | jq -r '.owner.login')
+          if [ -z "$OWNER" ] || [ "$OWNER" = "null" ]; then
+            echo "Gist non leggibile: controlla GIST_ID e GIST_TOKEN"
+            exit 1
+          fi
+          payload='{"files":{}}'
+          indice=""
           for file in output_m3u8/*.m3u8; do
-            nome_file=$(basename "$file")
-            echo "Carico $nome_file sul Gist..."
-            jq -n --arg nome "$nome_file" --rawfile c "$file" '{files: {($nome): {content: $c}}}' \
-            | curl -sS -X PATCH \
-                -H "Authorization: Bearer $GIST_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                "https://api.github.com/gists/$GIST_ID" -d @- > /dev/null
+            [ -e "$file" ] || continue
+            if ! grep -q '^#EXTINF' "$file"; then
+              echo "Salto $file (nessuna voce)"
+              continue
+            fi
+            nome=$(basename "$file")
+            payload=$(jq --arg n "$nome" --rawfile c "$file" '.files[$n] = {content: $c}' <<< "$payload")
+            indice+="https://gist.githubusercontent.com/$OWNER/$GIST_ID/raw/$nome"$'\n'
           done
-
+          if [ -z "$indice" ]; then
+            echo "Nessuna lista valida: non pubblico"
+            exit 1
+          fi
+          payload=$(jq --arg c "$indice" '.files["indice.txt"] = {content: $c}' <<< "$payload")
+          printf '%s' "$payload" | curl -sS -f -X PATCH \
+            -H "$AUTH" -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/gists/$GIST_ID" -d @- > /dev/null
+          echo "Indice pubblicato:"
+          printf '%s' "$indice"
