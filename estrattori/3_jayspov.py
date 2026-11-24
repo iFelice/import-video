@@ -240,4 +240,4 @@ if nuovi_video:
                 f.write(f"#EXTVLCOPT:http-referrer={ref}\n")
             f.write(f"{fls}\n")
 
-print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.") in '{FILE_MANCANTI}'.")
+print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
