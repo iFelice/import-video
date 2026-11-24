@@ -2,12 +2,11 @@ name: Aggiorna Playlist Video
 
 on:
   schedule:
-    # Esegue alle 08:00, 14:00, 18:00 e 22:00 ora italiana (UTC+1)
     - cron: '0 7,13,17,21 * * *'
-  workflow_dispatch: # Aggiunge il pulsante per avviarlo manualmente quando vuoi
+  workflow_dispatch:
 
 permissions:
-  contents: write # Permette a GitHub di salvare i file aggiornati nel repository
+  contents: write
 
 jobs:
   estrai:
@@ -22,20 +21,23 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Installa librerie
+      - name: Installa FFmpeg (ffprobe)
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Installa librerie Python
         run: pip install -r requirements.txt
 
       - name: Installa browser Chromium per Playwright
         run: playwright install --with-deps chromium
 
-      - name: Esegui tutti gli script Python presenti
+      - name: Esegui tutti gli script Python
         run: |
           for script in *.py; do
             echo "Avvio $script..."
             python "$script"
           done
 
-      - name: Salva playlist e storico aggiornati
+      - name: Salva playlist e storici aggiornati
         run: |
           git config --local user.email "github-actions[bot]@://github.com"
           git config --local user.name "github-actions[bot]"
