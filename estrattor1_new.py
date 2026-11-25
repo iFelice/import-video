@@ -33,23 +33,6 @@ os.makedirs("output_m3u8", exist_ok=True)
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-def ricava_categoria_da_url(url):
-    parsed = urlparse(url)
-    parametri = parse_qs(parsed.query)
-    if "s" in parametri and parametri["s"]:
-        return parametri["s"][0].replace("+", " ").strip().title()
-    percorso = parsed.path.strip("/")
-    if not percorso:
-        return "Home"
-    parti = [p for p in percorso.split("/") if not re.match(r'^page[-_]?\d+$', p, re.IGNORECASE)]
-    return parti[-1].replace("-", " ").replace("_", " ").strip().title() if parti else "Generale"
-
-def pulisci_titolo_per_ricerca(titolo_grezzo):
-    for sep in [" - ", " | ", " – ", " — "]:
-        if sep in titolo_grezzo:
-            titolo_grezzo = titolo_grezzo.split(sep)[0]
-    return titolo_grezzo.strip()
-
 session = requests.Session()
 session.headers.update({
     "User-Agent": USER_AGENT,
@@ -95,9 +78,9 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
         print(f"Errore pagina {pagina}: {e}")
 
 print(f"\nTotale nuovi link da analizzare: {len(nuovi_link)}\n")
-
 pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+)["\']', re.IGNORECASE)
 pat_m3u8 = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
+
 
 def verifica_link_reale(url_flusso, referer):
     try:
@@ -115,6 +98,7 @@ def verifica_link_reale(url_flusso, referer):
         return "video" in res.stdout
     except Exception:
         return False
+
 
 def trova_server(html_text, soup_video, url_pagina):
     candidati, visti = [], set()
@@ -134,8 +118,10 @@ def trova_server(html_text, soup_video, url_pagina):
         if verifica_link_reale(link, url_pagina):
             return nome, link
     return None, None
-    def cerca_con_playwright(page, titolo_ricerca):
-        query = quote_plus(titolo_ricerca)
+
+
+def cerca_con_playwright(page, titolo_ricerca):
+    query = quote_plus(titolo_ricerca)
     js_find = "() => { for (const a of document.querySelectorAll('a[href]')) { if (a.querySelector('img') && !a.href.includes('logo') && a.href !== window.location.href) return a.href; } return null; }"
     for template in SITI_ALTERNATIVI:
         url_ric = template.format(query=query)
@@ -169,8 +155,6 @@ def trova_server(html_text, soup_video, url_pagina):
         except Exception as e:
             print(f"   -> Errore su {dom}: {e}")
     return None, None, None
-
-
 nuovi_video, mancanti = [], []
 
 with sync_playwright() as p:
