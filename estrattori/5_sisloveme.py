@@ -72,7 +72,7 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
     try:
         parsed = urlparse(pagina)
         base_url = f"{parsed.scheme}://{parsed.netloc}/"
-        gruppo_cat = ricava_categoria_da_url(pagina)
+        gruppo_cat = "SISLOVEME"
         risposta = session.get(pagina, timeout=15)
         print(f"Controllo: {pagina} [Gruppo: {gruppo_cat}] (HTTP: {risposta.status_code})")
         soup = BeautifulSoup(risposta.text, "html.parser")
