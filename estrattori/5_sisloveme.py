@@ -6,11 +6,11 @@ from playwright.sync_api import sync_playwright
 # 1. Pagine principali (dopo il primo giro completo, lascia SOLO la Pagina 1)
 pagine_indice = [
     "https://porn4days.pw/search/?s=SisLovesMe",
+    "https://horny69.com/studios/sis-loves-me",
+    "https://horny69.com/studios/sis-loves-me?page=2",
 ]
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 SITI_ALTERNATIVI = [
-    "https://horny69.com/search?q=/{query}",
-    "https://www.fpo.xxx/search/{query}"
 ]
 
 FILE_STORICO = "archivio_storico/sisloveme.txt"
