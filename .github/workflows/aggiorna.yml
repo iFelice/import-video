@@ -3,7 +3,7 @@ name: Aggiorna Playlist Video
 on:
   schedule:
     # 08:00, 14:00, 18:00 e 22:00 ora solare italiana (UTC+1)
-    - cron: '0 6,16 * * *'
+    - cron: '33 5,10,17 * * *'
   workflow_dispatch:
 
 permissions:
