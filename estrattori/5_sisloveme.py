@@ -18,7 +18,7 @@ SITI_ALTERNATIVI = [
 ]
 
 FILE_STORICO = "archivio_storico/sisloveme.txt"
-FILE_MANCANTI = "archivio_storico/da_recuperare_sisloveme.txt"
+FILE_MANCANTI = "da_recuperare/sisloveme.txt"
 FILE_PLAYLIST = "output_m3u8/5_sisloveme.m3u8"
 
 os.makedirs("archivio_storico", exist_ok=True)
@@ -237,5 +237,62 @@ if nuovi_video:
             if ref:
                 f.write(f"#EXTVLCOPT:http-referrer={ref}\n")
             f.write(f"{fls}\n")
+
+FILE_RECUPERATI = "recuperati/sisloveme.txt"
+os.makedirs("recuperati", exist_ok=True)
+
+if os.path.exists(FILE_RECUPERATI):
+    with open(FILE_RECUPERATI, "r", encoding="utf-8") as f:
+        righe_rec = [r.strip() for r in f if r.strip() and not r.startswith("#")]
+
+    if righe_rec:
+        esiste = os.path.exists(FILE_PLAYLIST) and os.path.getsize(FILE_PLAYLIST) > 0
+        origini_recuperate = set()
+        aggiunti_manuali = 0
+
+        with open(FILE_PLAYLIST, "a", encoding="utf-8") as f_pl:
+            if not esiste:
+                f_pl.write("#EXTM3U\n")
+            for idx_m, riga in enumerate(righe_rec, start=1):
+                campi = {}
+                for pezzo in riga.split("|"):
+                    if ":" in pezzo:
+                        k, v = pezzo.split(":", 1)
+                        campi[k.strip().upper()] = v.strip()
+
+                tit = campi.get("TITOLO", "Video Recuperato").replace(",", " -")
+                grp = campi.get("GRUPPO", "Generale")
+                logo = campi.get("LOGO", "")
+                orig = campi.get("ORIGINE", "")
+                fls = campi.get("LINK", "")
+                ref = campi.get("REFERER", orig)
+
+                if fls:
+                    f_pl.write(f'#EXTINF:-1 tvg-id="man{idx_m}" tvg-logo="{logo}" group-title="{grp}",{tit}\n')
+                    f_pl.write(f"#EXTVLCOPT:http-user-agent={USER_AGENT}\n")
+                    if ref:
+                        f_pl.write(f"#EXTVLCOPT:http-referrer={ref}\n")
+                    f_pl.write(f"{fls}\n")
+                    aggiunti_manuali += 1
+                    if orig:
+                        origini_recuperate.add(orig)
+
+        if origini_recuperate:
+            gia_estratti.update(origini_recuperate)
+            with open(FILE_STORICO, "w", encoding="utf-8") as f_st:
+                for u in sorted(gia_estratti):
+                    f_st.write(f"{u}\n")
+
+            if os.path.exists(FILE_MANCANTI):
+                with open(FILE_MANCANTI, "r", encoding="utf-8") as f_m:
+                    righe_manc = [r for r in f_m if not any(o in r for o in origini_recuperate)]
+                with open(FILE_MANCANTI, "w", encoding="utf-8") as f_m:
+                    f_m.writelines(righe_manc)
+
+        # Svuota il file dei recuperati lasciando solo la riga guida
+        with open(FILE_RECUPERATI, "w", encoding="utf-8") as f_rec:
+            f_rec.write("# Incolla qui le righe da da_recuperare_sisloveme.txt aggiungendo | LINK: https://...mp4\n")
+
+        print(f"Importati {aggiunti_manuali} video recuperati manualmente!")
 
 print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
