@@ -10,8 +10,6 @@ pagine_indice = [
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 SITI_ALTERNATIVI = [
-    "https://horny69.com/search?q=/{query}",
-    "https://www.fpo.xxx/search/{query}"
 ]
 
 FILE_STORICO = "archivio_storico/dadcrush.txt"
