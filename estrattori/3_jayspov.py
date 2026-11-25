@@ -7,18 +7,11 @@ from playwright.sync_api import sync_playwright
 pagine_indice = [
     "https://porn4days.pw/search/?s=jayspov",
     "https://porn4days.pw/search/page2/?s=jayspov",
-    "https://porn4days.pw/search/page3/?s=jayspov",
-    "https://porn4days.pw/search/page4/?s=jayspov",
-    "https://porn4days.pw/search/page5/?s=jayspov",
-    "https://porn4days.pw/search/page6/?s=jayspov",
-    "https://porn4days.pw/search/page7/?s=jayspov",
-    "https://porn4days.pw/search/page8/?s=jayspov",
-    "https://porn4days.pw/search/page9/?s=jayspov",
+    "https://horny69.com/studios/jays-pov",
+    "https://horny69.com/studios/jays-pov?page=2",
 ]
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 SITI_ALTERNATIVI = [
-    "https://horny69.com/search?q=/{query}",
-    "https://www.fpo.xxx/search/{query}"
 ]
 
 FILE_STORICO = "archivio_storico/jayspov.txt"
