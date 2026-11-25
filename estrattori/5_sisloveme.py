@@ -238,6 +238,3 @@ if nuovi_video:
             f.write(f"{fls}\n")
 
 print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
-            f.write(f"{fls}\n")
-
-print(f"\nCompletato! Aggiunti {len(nuovi_video)} video OK, salvati {len(mancanti)} in '{FILE_MANCANTI}'.")
