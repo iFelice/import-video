@@ -6,8 +6,6 @@ from playwright.sync_api import sync_playwright
 # 1. Pagine principali (dopo il primo giro completo, lascia SOLO la Pagina 1)
 pagine_indice = [
     "https://porn4days.pw/search/?s=carolina+guerrero",
-    "https://porn4days.pw/search/page2/?s=carolina+guerrero",
-    "https://porn4days.pw/search/page3/?s=carolina+guerrero",
 ]
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 SITI_ALTERNATIVI = [
