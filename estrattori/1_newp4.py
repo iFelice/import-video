@@ -15,10 +15,10 @@ SITI_ALTERNATIVI = [
     "https://www.fpo.xxx/search/{query}"
 ]
 
-FILE_STORICO = "archivio_storico/new.txt"
-FILE_MANCANTI = "da_recuperare/new.txt"
-FILE_RECUPERATI = "recuperati/new.txt"
-FILE_PLAYLIST = "output_m3u8/1_new.m3u8"
+FILE_STORICO = "archivio_storico/newp4.txt"
+FILE_MANCANTI = "da_recuperare/newp4.txt"
+FILE_RECUPERATI = "recuperati/newp4.txt"
+FILE_PLAYLIST = "output_m3u8/1_newp4.m3u8"
 
 os.makedirs("archivio_storico", exist_ok=True)
 os.makedirs("da_recuperare", exist_ok=True)
@@ -30,7 +30,7 @@ for f_init in (FILE_STORICO, FILE_MANCANTI, FILE_RECUPERATI):
     if not os.path.exists(f_init):
         with open(f_init, "w", encoding="utf-8") as f:
             if f_init == FILE_RECUPERATI:
-                f.write("# Incolla qui le righe da da_recuperare/new.txt aggiungendo | LINK: https://...mp4\n")
+                f.write("# Incolla qui le righe da da_recuperare/newp4.txt aggiungendo | LINK: https://...mp4\n")
 
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -70,7 +70,7 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
     try:
         parsed = urlparse(pagina)
         base_url = f"{parsed.scheme}://{parsed.netloc}/"
-        gruppo_cat = "NUOVI"
+        gruppo_cat = "NUOVI P4"
         risposta = session.get(pagina, timeout=15)
         print(f"Controllo: {pagina} [Gruppo: {gruppo_cat}] (HTTP: {risposta.status_code})")
         soup = BeautifulSoup(risposta.text, "html.parser")
@@ -245,7 +245,7 @@ if nuovi_video:
                 f.write(f"#EXTVLCOPT:http-referrer={ref}\n")
             f.write(f"{fls}\n")
 
-FILE_RECUPERATI = "recuperati/new.txt"
+FILE_RECUPERATI = "recuperati/newp4.txt"
 os.makedirs("recuperati", exist_ok=True)
 
 if os.path.exists(FILE_RECUPERATI):
@@ -298,7 +298,7 @@ if os.path.exists(FILE_RECUPERATI):
 
         # Svuota il file dei recuperati lasciando solo la riga guida
         with open(FILE_RECUPERATI, "w", encoding="utf-8") as f_rec:
-            f_rec.write("# Incolla qui le righe da da_recuperare_new.txt aggiungendo | LINK: https://...mp4\n")
+            f_rec.write("# Incolla qui le righe da da_recuperare_newp4.txt aggiungendo | LINK: https://...mp4\n")
 
         print(f"Importati {aggiunti_manuali} video recuperati manualmente!")
 
