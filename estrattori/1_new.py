@@ -7,16 +7,6 @@ pagine_indice = [
     "https://porn4days.pw/newest",
     "https://porn4days.pw/newest/page2/",
     "https://porn4days.pw/newest/page3/",
-    "https://porn4days.pw/newest/page4/",
-    "https://porn4days.pw/newest/page5/",
-    "https://porn4days.pw/newest/page6/",
-    "https://porn4days.pw/newest/page7/",
-    "https://porn4days.pw/newest/page8/",
-    "https://porn4days.pw/newest/page9/",
-    "https://porn4days.pw/newest/page10/",
-    "https://porn4days.pw/newest/page11/",
-    "https://porn4days.pw/newest/page12/",
-    "https://porn4days.pw/newest/page13/",
 ]
 
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
