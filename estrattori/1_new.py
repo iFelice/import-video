@@ -21,17 +21,46 @@ pagine_indice = [
 
 # 2. Siti alternativi veloci (senza Playwright) usando il segnaposto QUERY_QUI
 SITI_ALTERNATIVI = [
-    # "https://sito-alternativo-1.com{query}",
+    "https://horny69.com/search?q=/{query}",
+    "https://www.fpo.xxx/search/{query}"
 ]
 
 FILE_STORICO = "archivio_storico/new.txt"
-FILE_MANCANTI = "archivio_storico/da_recuperare_new.txt"
+FILE_MANCANTI = "da_recuperare/new.txt"
+FILE_RECUPERATI = "recuperati/new.txt"
 FILE_PLAYLIST = "output_m3u8/1_new.m3u8"
 
 os.makedirs("archivio_storico", exist_ok=True)
+os.makedirs("da_recuperare", exist_ok=True)
+os.makedirs("recuperati", exist_ok=True)
 os.makedirs("output_m3u8", exist_ok=True)
 
+# Crea subito i file se non esistono ancora, così li vedi nel repository
+for f_init in (FILE_STORICO, FILE_MANCANTI, FILE_RECUPERATI):
+    if not os.path.exists(f_init):
+        with open(f_init, "w", encoding="utf-8") as f:
+            if f_init == FILE_RECUPERATI:
+                f.write("# Incolla qui le righe da da_recuperare/new.txt aggiungendo | LINK: https://...mp4\n")
+
+
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+def ricava_categoria_da_url(url):
+    parsed = urlparse(url)
+    parametri = parse_qs(parsed.query)
+    if "s" in parametri and parametri["s"]:
+        return parametri["s"][0].replace("+", " ").strip().title()
+    percorso = parsed.path.strip("/")
+    if not percorso:
+        return "Home"
+    parti = [p for p in percorso.split("/") if not re.match(r'^page[-_]?\d+$', p, re.IGNORECASE)]
+    return parti[-1].replace("-", " ").replace("_", " ").strip().title() if parti else "Generale"
+
+def pulisci_titolo_per_ricerca(titolo_grezzo):
+    for sep in [" - ", " | ", " – ", " — "]:
+        if sep in titolo_grezzo:
+            titolo_grezzo = titolo_grezzo.split(sep)[0]
+    return titolo_grezzo.strip()
 
 session = requests.Session()
 session.headers.update({
@@ -78,9 +107,9 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
         print(f"Errore pagina {pagina}: {e}")
 
 print(f"\nTotale nuovi link da analizzare: {len(nuovi_link)}\n")
+
 pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+)["\']', re.IGNORECASE)
 pat_m3u8 = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
-
 
 def verifica_link_reale(url_flusso, referer):
     try:
@@ -98,7 +127,6 @@ def verifica_link_reale(url_flusso, referer):
         return "video" in res.stdout
     except Exception:
         return False
-
 
 def trova_server(html_text, soup_video, url_pagina):
     candidati, visti = [], set()
@@ -118,8 +146,6 @@ def trova_server(html_text, soup_video, url_pagina):
         if verifica_link_reale(link, url_pagina):
             return nome, link
     return None, None
-
-
 def cerca_con_playwright(page, titolo_ricerca):
     query = quote_plus(titolo_ricerca)
     js_find = "() => { for (const a of document.querySelectorAll('a[href]')) { if (a.querySelector('img') && !a.href.includes('logo') && a.href !== window.location.href) return a.href; } return null; }"
@@ -155,6 +181,7 @@ def cerca_con_playwright(page, titolo_ricerca):
         except Exception as e:
             print(f"   -> Errore su {dom}: {e}")
     return None, None, None
+
 nuovi_video, mancanti = [], []
 
 with sync_playwright() as p:
@@ -228,4 +255,62 @@ if nuovi_video:
                 f.write(f"#EXTVLCOPT:http-referrer={ref}\n")
             f.write(f"{fls}\n")
 
+FILE_RECUPERATI = "recuperati/sisloveme.txt"
+os.makedirs("recuperati", exist_ok=True)
+
+if os.path.exists(FILE_RECUPERATI):
+    with open(FILE_RECUPERATI, "r", encoding="utf-8") as f:
+        righe_rec = [r.strip() for r in f if r.strip() and not r.startswith("#")]
+
+    if righe_rec:
+        esiste = os.path.exists(FILE_PLAYLIST) and os.path.getsize(FILE_PLAYLIST) > 0
+        origini_recuperate = set()
+        aggiunti_manuali = 0
+
+        with open(FILE_PLAYLIST, "a", encoding="utf-8") as f_pl:
+            if not esiste:
+                f_pl.write("#EXTM3U\n")
+            for idx_m, riga in enumerate(righe_rec, start=1):
+                campi = {}
+                for pezzo in riga.split("|"):
+                    if ":" in pezzo:
+                        k, v = pezzo.split(":", 1)
+                        campi[k.strip().upper()] = v.strip()
+
+                tit = campi.get("TITOLO", "Video Recuperato").replace(",", " -")
+                grp = campi.get("GRUPPO", "Generale")
+                logo = campi.get("LOGO", "")
+                orig = campi.get("ORIGINE", "")
+                fls = campi.get("LINK", "")
+                ref = campi.get("REFERER", orig)
+
+                if fls:
+                    f_pl.write(f'#EXTINF:-1 tvg-id="man{idx_m}" tvg-logo="{logo}" group-title="{grp}",{tit}\n')
+                    f_pl.write(f"#EXTVLCOPT:http-user-agent={USER_AGENT}\n")
+                    if ref:
+                        f_pl.write(f"#EXTVLCOPT:http-referrer={ref}\n")
+                    f_pl.write(f"{fls}\n")
+                    aggiunti_manuali += 1
+                    if orig:
+                        origini_recuperate.add(orig)
+
+        if origini_recuperate:
+            gia_estratti.update(origini_recuperate)
+            with open(FILE_STORICO, "w", encoding="utf-8") as f_st:
+                for u in sorted(gia_estratti):
+                    f_st.write(f"{u}\n")
+
+            if os.path.exists(FILE_MANCANTI):
+                with open(FILE_MANCANTI, "r", encoding="utf-8") as f_m:
+                    righe_manc = [r for r in f_m if not any(o in r for o in origini_recuperate)]
+                with open(FILE_MANCANTI, "w", encoding="utf-8") as f_m:
+                    f_m.writelines(righe_manc)
+
+        # Svuota il file dei recuperati lasciando solo la riga guida
+        with open(FILE_RECUPERATI, "w", encoding="utf-8") as f_rec:
+            f_rec.write("# Incolla qui le righe da da_recuperare_new.txt aggiungendo | LINK: https://...mp4\n")
+
+        print(f"Importati {aggiunti_manuali} video recuperati manualmente!")
+
 print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
+
