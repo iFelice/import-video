@@ -24,7 +24,7 @@ SITI_ALTERNATIVI = [
 FILE_STORICO = "archivio_storico/jayspov.txt"
 FILE_MANCANTI = "da_recuperare/jayspov.txt"
 FILE_RECUPERATI = "recuperati/jayspov.txt"
-FILE_PLAYLIST = "output_m3u8/1_jayspov.m3u8"
+FILE_PLAYLIST = "output_m3u8/3_jayspov.m3u8"
 
 os.makedirs("archivio_storico", exist_ok=True)
 os.makedirs("da_recuperare", exist_ok=True)
