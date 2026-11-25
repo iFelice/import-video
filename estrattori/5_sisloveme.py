@@ -19,10 +19,21 @@ SITI_ALTERNATIVI = [
 
 FILE_STORICO = "archivio_storico/sisloveme.txt"
 FILE_MANCANTI = "da_recuperare/sisloveme.txt"
+FILE_RECUPERATI = "recuperati/sisoloveme.txt"
 FILE_PLAYLIST = "output_m3u8/5_sisloveme.m3u8"
 
 os.makedirs("archivio_storico", exist_ok=True)
+os.makedirs("da_recuperare", exist_ok=True)
+os.makedirs("recuperati", exist_ok=True)
 os.makedirs("output_m3u8", exist_ok=True)
+
+# Crea subito i file se non esistono ancora, così li vedi nel repository
+for f_init in (FILE_STORICO, FILE_MANCANTI, FILE_RECUPERATI):
+    if not os.path.exists(f_init):
+        with open(f_init, "w", encoding="utf-8") as f:
+            if f_init == FILE_RECUPERATI:
+                f.write("# Incolla qui le righe da da_recuperare/sisloveme.txt aggiungendo | LINK: https://...mp4\n")
+
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
