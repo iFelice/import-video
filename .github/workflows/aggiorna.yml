@@ -2,7 +2,7 @@ name: Aggiorna Playlist Video
 
 on:
   schedule:
-    - cron: '37 5,10,17 * * *'
+    - cron: '37 5,10,16,17 * * *'
   workflow_dispatch:
 
 permissions:
