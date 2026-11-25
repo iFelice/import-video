@@ -23,7 +23,7 @@ SITI_ALTERNATIVI = [
 FILE_STORICO = "archivio_storico/dadcrush.txt"
 FILE_MANCANTI = "da_recuperare/dadcrush.txt"
 FILE_RECUPERATI = "recuperati/dadcrush.txt"
-FILE_PLAYLIST = "output_m3u8/1_dadcrush.m3u8"
+FILE_PLAYLIST = "output_m3u8/2_dadcrush.m3u8"
 
 os.makedirs("archivio_storico", exist_ok=True)
 os.makedirs("da_recuperare", exist_ok=True)
