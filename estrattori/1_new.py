@@ -80,7 +80,7 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
     try:
         parsed = urlparse(pagina)
         base_url = f"{parsed.scheme}://{parsed.netloc}/"
-        gruppo_cat = ricava_categoria_da_url(pagina)
+        gruppo_cat = "NUOVI"
         risposta = session.get(pagina, timeout=15)
         print(f"Controllo: {pagina} [Gruppo: {gruppo_cat}] (HTTP: {risposta.status_code})")
         soup = BeautifulSoup(risposta.text, "html.parser")
@@ -255,7 +255,7 @@ if nuovi_video:
                 f.write(f"#EXTVLCOPT:http-referrer={ref}\n")
             f.write(f"{fls}\n")
 
-FILE_RECUPERATI = "recuperati/sisloveme.txt"
+FILE_RECUPERATI = "recuperati/new.txt"
 os.makedirs("recuperati", exist_ok=True)
 
 if os.path.exists(FILE_RECUPERATI):
