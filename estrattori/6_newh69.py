@@ -64,6 +64,16 @@ if os.path.exists(FILE_STORICO):
     with open(FILE_STORICO, "r", encoding="utf-8") as f:
         gia_estratti = {riga.strip() for riga in f if riga.strip()}
 
+# Esclude temporaneamente dalla scansione anche i titoli già in "da_recuperare"
+da_saltare = set(gia_estratti)
+if os.path.exists(FILE_MANCANTI):
+    with open(FILE_MANCANTI, "r", encoding="utf-8") as f:
+        for riga in f:
+            if "ORIGINE:" in riga:
+                url_orig = riga.split("ORIGINE:", 1)[1].split("|")[0].strip()
+                if url_orig:
+                    da_saltare.add(url_orig)
+
 nuovi_link, link_visti = [], set()
 
 for idx_pag, pagina in enumerate(pagine_indice, start=1):
@@ -85,7 +95,7 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
                 url_completo = urljoin(pagina, href_orig) if href_orig.startswith("..") else urljoin(base_url, href_orig.lstrip("/"))
                 if url_completo.rstrip("/") == base_url.rstrip("/"):
                     continue
-                if url_completo not in gia_estratti and url_completo not in link_visti:
+                if url_completo not in da_saltare and url_completo not in link_visti:
                     link_visti.add(url_completo)
                     trovati += 1
                     logo_url = urljoin(pagina, raw_logo) if raw_logo and not raw_logo.startswith("data:") else ""
