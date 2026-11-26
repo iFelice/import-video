@@ -13,21 +13,6 @@ NOME_LISTA = "NuoviH69"
 # INSERISCI GLI URL DELLE PAGINE DA SCANSIONARE.
 # DOPO IL PRIMO GIRO COMPLETO, LASCIA SOLO LA PAGINA 1 PER VELOCIZZARE.
 pagine_indice = [
-    "https://horny69.com/videos?",
-    "https://horny69.com/videos?page=2",
-    "https://horny69.com/videos?page=3",
-    "https://horny69.com/videos?page=4",
-    "https://horny69.com/videos?page=5",
-    "https://horny69.com/videos?page=6",
-    "https://horny69.com/videos?page=7",
-    "https://horny69.com/videos?page=8",
-    "https://horny69.com/videos?page=9",
-    "https://horny69.com/videos?page=10",
-    "https://horny69.com/videos?page=11",
-    "https://horny69.com/videos?page=12",
-    "https://horny69.com/videos?page=13",
-    "https://horny69.com/videos?page=14",
-    "https://horny69.com/videos?page=15",
     "https://horny69.com/videos?page=16",
     "https://horny69.com/videos?page=17",
     "https://horny69.com/videos?page=18",
