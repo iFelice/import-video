@@ -15,10 +15,6 @@ NOME_LISTA = "NuoviH69"
 pagine_indice = [
     "https://horny69.com/videos?",
     "https://horny69.com/videos?page=2",
-    "https://horny69.com/videos?page=3",
-    "https://horny69.com/videos?page=4",
-    "https://horny69.com/videos?page=4",
-    "https://horny69.com/videos?page=5",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
