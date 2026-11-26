@@ -13,14 +13,14 @@ NOME_LISTA = "NuoviCumLoude"
 # INSERISCI GLI URL DELLE PAGINE DA SCANSIONARE.
 # DOPO IL PRIMO GIRO COMPLETO, LASCIA SOLO LA PAGINA 1 PER VELOCIZZARE.
 pagine_indice = [
-    "https://www.cumlouder.com/es/12/",
-    "https://www.cumlouder.com/es/13/",
-    "https://www.cumlouder.com/es/14/",
-    "https://www.cumlouder.com/es/15/",
-    "https://www.cumlouder.com/es/16/",
-    "https://www.cumlouder.com/es/17/",
-    "https://www.cumlouder.com/es/18/",
-    "https://www.cumlouder.com/es/19/",
+    "https://www.cumlouder.com/es/4/",
+    "https://www.cumlouder.com/es/5/",
+    "https://www.cumlouder.com/es/6/",
+    "https://www.cumlouder.com/es/7/",
+    "https://www.cumlouder.com/es/8/",
+    "https://www.cumlouder.com/es/9/",
+    "https://www.cumlouder.com/es/10/",
+    "https://www.cumlouder.com/es/11/",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
