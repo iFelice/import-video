@@ -15,7 +15,14 @@ NOME_LISTA = "NuoviOk"
 pagine_indice = [
     "https://ok.xxx",
     "https://ok.xxx/2/",
-    "https://ok.xxx/3/",
+    "https://ok.xxx/4/",
+    "https://ok.xxx/5/",
+    "https://ok.xxx/6/",
+    "https://ok.xxx/7/",
+    "https://ok.xxx/8/",
+    "https://ok.xxx/9/",
+    "https://ok.xxx/10/",
+    "https://ok.xxx/11/",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
