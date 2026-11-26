@@ -44,7 +44,7 @@ jobs:
           for script in estrattori/*.py; do
             [ -e "$script" ] || continue
             echo "Avvio $script..."
-            if ! timeout 1800 python "$script"; then
+            if ! timeout 1800 python -u "$script"; then
               echo "::error::Errore in $script"
               errori=1
             fi
