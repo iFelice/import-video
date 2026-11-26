@@ -20,6 +20,7 @@ pagine_indice = [
 # OPZIONALE: INSERISCI UN NOME FISSO PER IL GRUPPO SU SMART TV (es. "I Miei Cartoni").
 # LASCIA "" (VUOTO) SE VUOI CHE IL NOME VENGA RICAVATO IN AUTOMATICO DALL'URL.
 GRUPPO_FISSO = ""
+
 # DURATA MINIMA IN SECONDI PER SCARTARE SPOT E ANTEPRIME (180 = 3 MINUTI)
 DURATA_MINIMA_SECONDI = 180
 
@@ -133,6 +134,27 @@ pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+
 pat_m3u8 = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
 
 
+def risolvi_redirect_se_necessario(url_flusso, referer):
+    """Segue i redirect /get_file/ fino all'URL finale solo se non introduce scadenze brevi o blocchi IP."""
+    if "/get_file/" not in url_flusso:
+        return url_flusso
+    try:
+        r = session.get(
+            url_flusso,
+            headers={"User-Agent": USER_AGENT, "Referer": referer},
+            stream=True,
+            allow_redirects=True,
+            timeout=10
+        )
+        r.close()
+        if r.status_code in (200, 206) and r.url:
+            if not re.search(r'(?:exp_time=|expires=|ip=)', r.url, re.IGNORECASE):
+                return r.url
+    except Exception:
+        pass
+    return url_flusso
+
+
 def verifica_link_reale(url_flusso, referer):
     try:
         if ".m3u8" in url_flusso.lower():
@@ -150,10 +172,10 @@ def verifica_link_reale(url_flusso, referer):
         if "codec_type=video" not in out:
             return False
 
-        # Controlla la durata: se > 0 deve essere almeno DURATA_MINIMA_SECONDI (180s)
+        # Scarta i video con durata dichiarata > 0 ma inferiore a DURATA_MINIMA_SECONDI (180s)
         for riga in out.splitlines():
             if riga.startswith("duration="):
-                val = riga.split("=", 1)[1].strip()
+                val = riga.split("=", 1).strip()
                 if val and val != "N/A":
                     durata = float(val)
                     if 0 < durata < DURATA_MINIMA_SECONDI:
@@ -161,7 +183,6 @@ def verifica_link_reale(url_flusso, referer):
         return True
     except Exception:
         return False
-
 
 
 def trova_server(html_text, soup_video, url_pagina):
@@ -179,8 +200,9 @@ def trova_server(html_text, soup_video, url_pagina):
             candidati.append(("FALLBACK_M3U8", link))
             visti.add(link)
     for nome, link in candidati:
-        if verifica_link_reale(link, url_pagina):
-            return nome, link
+        link_risolto = risolvi_redirect_se_necessario(link, url_pagina)
+        if verifica_link_reale(link_risolto, url_pagina):
+            return nome, link_risolto
     return None, None
 
 
@@ -219,6 +241,7 @@ def cerca_con_playwright(page, titolo_ricerca):
         except Exception as e:
             print(f"   -> Errore su {dom}: {e}")
     return None, None, None
+
 
 nuovi_video, mancanti = [], []
 
@@ -341,12 +364,3 @@ if os.path.exists(FILE_RECUPERATI):
             if os.path.exists(FILE_MANCANTI):
                 with open(FILE_MANCANTI, "r", encoding="utf-8") as f_m:
                     righe_manc = [r for r in f_m if not any(o in r for o in origini_recuperate)]
-                with open(FILE_MANCANTI, "w", encoding="utf-8") as f_m:
-                    f_m.writelines(righe_manc)
-
-        with open(FILE_RECUPERATI, "w", encoding="utf-8") as f_rec:
-            f_rec.write(f"# Incolla qui le righe da {FILE_MANCANTI} aggiungendo | LINK: https://...mp4\n")
-
-        print(f"Importati {aggiunti_manuali} video recuperati manualmente!")
-
-print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
