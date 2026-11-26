@@ -20,6 +20,8 @@ pagine_indice = [
 # OPZIONALE: INSERISCI UN NOME FISSO PER IL GRUPPO SU SMART TV (es. "I Miei Cartoni").
 # LASCIA "" (VUOTO) SE VUOI CHE IL NOME VENGA RICAVATO IN AUTOMATICO DALL'URL.
 GRUPPO_FISSO = ""
+# DURATA MINIMA IN SECONDI PER SCARTARE SPOT E ANTEPRIME (180 = 3 MINUTI)
+DURATA_MINIMA_SECONDI = 180
 
 # INSERISCI I SITI ALTERNATIVI USANDO {query} AL POSTO DEL TERMINE DI RICERCA.
 # LASCIA LA LISTA VUOTA [] SE NON VUOI USARE SITI ALTERNATIVI.
@@ -140,13 +142,26 @@ def verifica_link_reale(url_flusso, referer):
         cmd = [
             "ffprobe", "-v", "error", "-user_agent", USER_AGENT,
             "-headers", f"Referer: {referer}\r\n",
-            "-show_entries", "stream=codec_type",
-            "-of", "default=noprint_wrappers=1:nokey=1", url_flusso
+            "-show_entries", "format=duration:stream=codec_type",
+            "-of", "default=noprint_wrappers=1", url_flusso
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        return "video" in res.stdout
+        out = res.stdout
+        if "codec_type=video" not in out:
+            return False
+
+        # Controlla la durata: se > 0 deve essere almeno DURATA_MINIMA_SECONDI (180s)
+        for riga in out.splitlines():
+            if riga.startswith("duration="):
+                val = riga.split("=", 1)[1].strip()
+                if val and val != "N/A":
+                    durata = float(val)
+                    if 0 < durata < DURATA_MINIMA_SECONDI:
+                        return False
+        return True
     except Exception:
         return False
+
 
 
 def trova_server(html_text, soup_video, url_pagina):
