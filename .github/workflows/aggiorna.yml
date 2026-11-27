@@ -61,12 +61,15 @@ jobs:
         run: |
           mkdir -p archivio_storico da_recuperare recuperati output_m3u8
           GH_HOST="github.com"
+          
+          # Configurazione dell'identità Git per il bot di GitHub Actions
+          git config --local user.name "github-actions[bot]"
           git config --local user.email "41898282+github-actions[bot]@users.noreply.${GH_HOST}"
+          
           git add -A output_m3u8/ archivio_storico/ da_recuperare/ recuperati/
-
           git diff --cached --quiet && exit 0
           git commit -m "Aggiornamento automatico playlist"
-
+          
           git fetch origin main
           git rebase -X ours origin/main
           git push origin HEAD:main
