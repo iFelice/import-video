@@ -33,6 +33,7 @@ SITI_ALTERNATIVI = [
 # 2. PERCORSI AUTOMATICI (NON SERVE MODIFICARLI SE USI NOME_LISTA QUI SOPRA)
 # ==============================================================================
 
+
 FILE_STORICO = f"archivio_storico/storico_{NOME_LISTA}.txt"
 FILE_MANCANTI = f"da_recuperare/{NOME_LISTA}.txt"
 FILE_RECUPERATI = f"recuperati/{NOME_LISTA}.txt"
@@ -132,6 +133,27 @@ pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+
 pat_m3u8 = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
 
 
+def risolvi_redirect_se_necessario(url_flusso, referer):
+    """Segue i redirect /get_file/ fino all'URL finale solo se non introduce scadenze brevi o blocchi IP."""
+    if "/get_file/" not in url_flusso:
+        return url_flusso
+    try:
+        r = session.get(
+            url_flusso,
+            headers={"User-Agent": USER_AGENT, "Referer": referer},
+            stream=True,
+            allow_redirects=True,
+            timeout=10
+        )
+        r.close()
+        if r.status_code in (200, 206) and r.url:
+            if not re.search(r'(?:exp_time=|expires=|ip=)', r.url, re.IGNORECASE):
+                return r.url
+    except Exception:
+        pass
+    return url_flusso
+
+
 def verifica_link_reale(url_flusso, referer):
     try:
         if ".m3u8" in url_flusso.lower():
@@ -141,11 +163,23 @@ def verifica_link_reale(url_flusso, referer):
         cmd = [
             "ffprobe", "-v", "error", "-user_agent", USER_AGENT,
             "-headers", f"Referer: {referer}\r\n",
-            "-show_entries", "stream=codec_type",
-            "-of", "default=noprint_wrappers=1:nokey=1", url_flusso
+            "-show_entries", "format=duration:stream=codec_type",
+            "-of", "default=noprint_wrappers=1", url_flusso
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
-        return "video" in res.stdout
+        out = res.stdout
+        if "codec_type=video" not in out:
+            return False
+
+        # Scarta i video con durata dichiarata > 0 ma inferiore a DURATA_MINIMA_SECONDI (180s)
+        for riga in out.splitlines():
+            if riga.startswith("duration="):
+                val = riga.split("=", 1).strip()
+                if val and val != "N/A":
+                    durata = float(val)
+                    if 0 < durata < DURATA_MINIMA_SECONDI:
+                        return False
+        return True
     except Exception:
         return False
 
@@ -165,10 +199,10 @@ def trova_server(html_text, soup_video, url_pagina):
             candidati.append(("FALLBACK_M3U8", link))
             visti.add(link)
     for nome, link in candidati:
-        if verifica_link_reale(link, url_pagina):
-            return nome, link
+        link_risolto = risolvi_redirect_se_necessario(link, url_pagina)
+        if verifica_link_reale(link_risolto, url_pagina):
+            return nome, link_risolto
     return None, None
-
 
 def cerca_con_playwright(page, titolo_ricerca):
     query = quote_plus(titolo_ricerca)
@@ -205,12 +239,12 @@ def cerca_con_playwright(page, titolo_ricerca):
         except Exception as e:
             print(f"   -> Errore su {dom}: {e}")
     return None, None, None
-
 nuovi_video, mancanti = [], []
 
 with sync_playwright() as p:
     browser = None
     page = None
+    uso_browser = 0
     try:
         for url_video, pag_orig, tvg_id, logo_url, gruppo in nuovi_link:
             try:
@@ -227,30 +261,46 @@ with sync_playwright() as p:
                 ref_vlc = url_video if link_ok else None
 
                 if not link_ok and SITI_ALTERNATIVI:
-                    if browser is None:
+                    # Riavvia Chromium ogni 15 video di fallback per non saturare la RAM
+                    if browser is None or uso_browser >= 15:
+                        if browser:
+                            try:
+                                browser.close()
+                            except Exception:
+                                pass
                         browser = p.chromium.launch(headless=True)
                         page = browser.new_context(user_agent=USER_AGENT).new_page()
+                        uso_browser = 0
+                    uso_browser += 1
+
                     tit_clean = pulisci_titolo_per_ricerca(titolo)
-                    print(f"[FALLBACK] '{tit_clean}' -> Uso Playwright...")
+                    print(f"[FALLBACK] '{tit_clean}' -> Uso Playwright...", flush=True)
                     dom, link_ok, ref_vlc = cerca_con_playwright(page, tit_clean)
                     if link_ok:
                         srv = f"ALT:{dom}"
 
                 if link_ok:
                     nuovi_video.append((tvg_id, logo_url, gruppo, titolo, link_ok, ref_vlc))
-                    print(f"[OK - {srv}] [{gruppo}] {tvg_id} | {titolo}")
+                    print(f"[OK - {srv}] [{gruppo}] {tvg_id} | {titolo}", flush=True)
                     gia_estratti.add(url_video)
                 else:
                     mancanti.append((gruppo, logo_url, titolo, url_video))
-                    print(f"[FALLITO OVUNQUE] {url_video} (Titolo: {titolo})")
+                    print(f"[FALLITO OVUNQUE] {url_video} (Titolo: {titolo})", flush=True)
 
                 time.sleep(random.uniform(1.5, 2.5))
             except Exception as e:
-                print(f"Errore su {url_video}: {e}")
+                print(f"Errore su {url_video}: {type(e).__name__}: {e}", flush=True)
+    except Exception as exc:
+        import traceback
+        print(f"Errore critico nello script: {type(exc).__name__}: {exc}", flush=True)
+        traceback.print_exc()
+        raise
     finally:
         if browser:
-            browser.close()
-
+            try:
+                browser.close()
+            except Exception:
+                pass
 with open(FILE_STORICO, "w", encoding="utf-8") as f:
     for u in sorted(gia_estratti):
         f.write(f"{u}\n")
@@ -333,6 +383,6 @@ if os.path.exists(FILE_RECUPERATI):
         with open(FILE_RECUPERATI, "w", encoding="utf-8") as f_rec:
             f_rec.write(f"# Incolla qui le righe da {FILE_MANCANTI} aggiungendo | LINK: https://...mp4\n")
 
-        print(f"Importati {aggiunti_manuali} video recuperati manualmente!")
+        print(f"Importati {aggiunti_manuali} video recuperati manualmente!", flush=True)
 
-print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
+print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.", flush=True)
