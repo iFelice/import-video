@@ -2,7 +2,8 @@ name: Aggiorna Playlist Video
 
 on:
   schedule:
-    - cron: '11 */5,11,20 * * *'
+    # 08:17, 14:17, 18:17 e 22:17 ora solare italiana (minuto 17 per evitare code)
+    - cron: '17 7,13,17,21 * * *'
   workflow_dispatch:
 
 permissions:
@@ -56,20 +57,21 @@ jobs:
 
           exit "$errori"
 
-      -  - name: Salva playlist e storici aggiornati
+      - name: Salva playlist e storici aggiornati
         run: |
           mkdir -p archivio_storico da_recuperare recuperati output_m3u8
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.email "41898282+github-actions[bot]@://github.com"
           git config --local user.name "github-actions[bot]"
           git add -A output_m3u8/ archivio_storico/ da_recuperare/ recuperati/
+
           git diff --cached --quiet && exit 0
           git commit -m "Aggiornamento automatico playlist"
 
           git fetch origin main
           git rebase -X ours origin/main
           git push origin HEAD:main
-          
-     - name: Pubblica liste e indice sul Gist
+
+      - name: Pubblica liste e indice sul Gist
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ vars.GIST_ID }}
