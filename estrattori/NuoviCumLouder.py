@@ -34,7 +34,7 @@ SITI_ALTERNATIVI = [
 # 2. PERCORSI AUTOMATICI (NON SERVE MODIFICARLI SE USI NOME_LISTA QUI SOPRA)
 # ==============================================================================
 
-ILE_STORICO = f"archivio_storico/storico_{NOME_LISTA}.txt"
+FILE_STORICO = f"archivio_storico/storico_{NOME_LISTA}.txt"
 FILE_MANCANTI = f"da_recuperare/{NOME_LISTA}.txt"
 FILE_RECUPERATI = f"recuperati/{NOME_LISTA}.txt"
 FILE_PLAYLIST = f"output_m3u8/{NOME_LISTA}.m3u8"
