@@ -167,12 +167,14 @@ def risolvi_redirect_se_necessario(url_flusso, referer):
 
 def verifica_link_reale(url_flusso, referer):
     if PAT_BLOCCO_IP_TOKEN.search(url_flusso):
+        print(f"      [SCARTO-TOKEN] Link bloccato da filtro token/IP", flush=True)
         return False
 
     try:
         if ".m3u8" in url_flusso.lower():
             r = session.get(url_flusso, headers={"User-Agent": USER_AGENT, "Referer": referer}, timeout=10)
             if r.status_code != 200 or "#EXTM3U" not in r.text[:200]:
+                print(f"      [SCARTO-M3U8] HTTP {r.status_code} o header non valido", flush=True)
                 return False
         cmd = [
             "ffprobe", "-v", "error", "-user_agent", USER_AGENT,
@@ -183,6 +185,8 @@ def verifica_link_reale(url_flusso, referer):
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
         out = res.stdout
         if "codec_type=video" not in out:
+            err = res.stderr.strip().splitlines() if res.stderr.strip() else "nessun flusso video"
+            print(f"      [SCARTO-FFPROBE] {err}", flush=True)
             return False
 
         for riga in out.splitlines():
@@ -191,11 +195,12 @@ def verifica_link_reale(url_flusso, referer):
                 if val and val != "N/A":
                     durata = float(val)
                     if 0 < durata < DURATA_MINIMA_SECONDI:
+                        print(f"      [SCARTO-DURATA] Troppo corto: {durata}s < {DURATA_MINIMA_SECONDI}s", flush=True)
                         return False
         return True
-    except Exception:
+    except Exception as e:
+        print(f"      [SCARTO-ERRORE] {type(e).__name__}: {e}", flush=True)
         return False
-
 
         # Scarta i video con durata dichiarata > 0 ma inferiore a DURATA_MINIMA_SECONDI (180s)
         for riga in out.splitlines():
@@ -212,6 +217,7 @@ def verifica_link_reale(url_flusso, referer):
 
 def trova_server(html_text, soup_video, url_pagina):
     candidati, visti = [], set()
+    print(f"   -> Trovati {len(candidati)} candidati nella pagina ({[c for c in candidati]})", flush=True)
     for nome, link in pat_srv.findall(html_text):
         if link not in visti:
             candidati.append((nome, link))
@@ -412,4 +418,3 @@ if os.path.exists(FILE_RECUPERATI):
         print(f"Importati {aggiunti_manuali} video recuperati manualmente!", flush=True)
 
 print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.", flush=True)
-            
