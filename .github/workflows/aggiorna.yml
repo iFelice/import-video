@@ -75,14 +75,17 @@ jobs:
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ vars.GIST_ID }}
-          
         run: |
           set -euo pipefail
           GIST_ID=$(printf '%s' "$GIST_ID" | tr -d '[:space:]')
           GIST_TOKEN=$(printf '%s' "$GIST_TOKEN" | tr -d '[:space:]')
 
+          API_HOST="api.github.com"
+          RAW_HOST="gist.githubusercontent.com"
+          GIST_API_URL="https://${API_HOST}/gists/${GIST_ID}"
+
           AUTH="Authorization: Bearer $GIST_TOKEN"
-          RESP=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://github.com")
+          RESP=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "$GIST_API_URL")
           OWNER=$(jq -r '.owner.login // empty' <<< "$RESP")
 
           if [ -z "$OWNER" ]; then
@@ -100,7 +103,7 @@ jobs:
             fi
             nome=$(basename "$file")
             payload=$(jq --arg n "$nome" --rawfile c "$file" '.files[$n] = {content: $c}' <<< "$payload")
-            indice+="https://githubusercontent.com"$'\n'
+            indice+="https://${RAW_HOST}/${OWNER}/${GIST_ID}/raw/${nome}"$'\n'
           done
 
           if [ -z "$indice" ]; then
@@ -111,9 +114,10 @@ jobs:
           payload=$(jq --arg c "$indice" '.files["indice.txt"] = {content: $c}' <<< "$payload")
           printf '%s' "$payload" | curl -sS -f -X PATCH \
             -H "$AUTH" -H "Accept: application/vnd.github+json" \
-            "https://github.com" -d @- > /dev/null
+            "$GIST_API_URL" -d @- > /dev/null
           echo "Indice pubblicato:"
           printf '%s' "$indice"
+
 
       - name: Segnala errori degli estrattori
         if: steps.estrai.outcome == 'failure'
