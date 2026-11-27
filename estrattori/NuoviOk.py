@@ -53,7 +53,6 @@ for f_init in (FILE_STORICO, FILE_MANCANTI, FILE_RECUPERATI):
 
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-
 def ricava_categoria_da_url(url):
     if GRUPPO_FISSO:
         return GRUPPO_FISSO
@@ -247,7 +246,6 @@ nuovi_video, mancanti = [], []
 with sync_playwright() as p:
     browser = None
     page = None
-    uso_browser = 0
     try:
         for url_video, pag_orig, tvg_id, logo_url, gruppo in nuovi_link:
             try:
@@ -264,46 +262,30 @@ with sync_playwright() as p:
                 ref_vlc = url_video if link_ok else None
 
                 if not link_ok and SITI_ALTERNATIVI:
-                    # Riavvia Chromium ogni 15 video di fallback per non saturare la RAM
-                    if browser is None or uso_browser >= 15:
-                        if browser:
-                            try:
-                                browser.close()
-                            except Exception:
-                                pass
+                    if browser is None:
                         browser = p.chromium.launch(headless=True)
                         page = browser.new_context(user_agent=USER_AGENT).new_page()
-                        uso_browser = 0
-                    uso_browser += 1
-
                     tit_clean = pulisci_titolo_per_ricerca(titolo)
-                    print(f"[FALLBACK] '{tit_clean}' -> Uso Playwright...", flush=True)
+                    print(f"[FALLBACK] '{tit_clean}' -> Uso Playwright...")
                     dom, link_ok, ref_vlc = cerca_con_playwright(page, tit_clean)
                     if link_ok:
                         srv = f"ALT:{dom}"
 
                 if link_ok:
                     nuovi_video.append((tvg_id, logo_url, gruppo, titolo, link_ok, ref_vlc))
-                    print(f"[OK - {srv}] [{gruppo}] {tvg_id} | {titolo}", flush=True)
+                    print(f"[OK - {srv}] [{gruppo}] {tvg_id} | {titolo}")
                     gia_estratti.add(url_video)
                 else:
                     mancanti.append((gruppo, logo_url, titolo, url_video))
-                    print(f"[FALLITO OVUNQUE] {url_video} (Titolo: {titolo})", flush=True)
+                    print(f"[FALLITO OVUNQUE] {url_video} (Titolo: {titolo})")
 
                 time.sleep(random.uniform(1.5, 2.5))
             except Exception as e:
-                print(f"Errore su {url_video}: {type(e).__name__}: {e}", flush=True)
-    except Exception as exc:
-        import traceback
-        print(f"Errore critico nello script: {type(exc).__name__}: {exc}", flush=True)
-        traceback.print_exc()
-        raise
+                print(f"Errore su {url_video}: {e}")
     finally:
         if browser:
-            try:
-                browser.close()
-            except Exception:
-                pass
+            browser.close()
+
 with open(FILE_STORICO, "w", encoding="utf-8") as f:
     for u in sorted(gia_estratti):
         f.write(f"{u}\n")
