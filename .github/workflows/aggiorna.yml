@@ -15,7 +15,7 @@ concurrency:
 jobs:
   estrai:
     runs-on: ubuntu-latest
-    timeout-minutes: 0
+    timeout-minutes: 90
 
     steps:
       - name: Scarica i file del repository
@@ -39,39 +39,54 @@ jobs:
         id: estrai
         continue-on-error: true
         run: |
-          mkdir -p output_m3u8 archivio_storico
+          set +e
+          mkdir -p output_m3u8 archivio_storico da_recuperare recuperati
           errori=0
+
           for script in estrattori/*.py; do
             [ -e "$script" ] || continue
             echo "Avvio $script..."
-            if ! timeout 1800 python -u "$script"; then
-              echo "::error::Errore in $script"
+            timeout 1800 python -u "$script"
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              echo "::error file=$script::Estrattore fallito con exit code $status"
               errori=1
             fi
           done
-          exit $errori
 
-      - name: Salva playlist e storici aggiornati
+          exit "$errori"
+
+      -  - name: Salva playlist e storici aggiornati
         run: |
           mkdir -p archivio_storico da_recuperare recuperati output_m3u8
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add -A output_m3u8/ archivio_storico/ da_recuperare/ recuperati/
-          git commit -m "Aggiornamento automatico playlist" || exit 0
-          git push
+          git diff --cached --quiet && exit 0
+          git commit -m "Aggiornamento automatico playlist"
 
-      - name: Pubblica liste e indice sul Gist
+          git fetch origin main
+          git rebase -X ours origin/main
+          git push origin HEAD:main
+          
+     - name: Pubblica liste e indice sul Gist
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ vars.GIST_ID }}
         run: |
           set -euo pipefail
+          GIST_ID=$(printf '%s' "$GIST_ID" | tr -d '[:space:]')
+          GIST_TOKEN=$(printf '%s' "$GIST_TOKEN" | tr -d '[:space:]')
+
           AUTH="Authorization: Bearer $GIST_TOKEN"
-          OWNER=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://api.github.com/gists/$GIST_ID" | jq -r '.owner.login')
-          if [ -z "$OWNER" ] || [ "$OWNER" = "null" ]; then
-            echo "Gist non leggibile: controlla GIST_ID e GIST_TOKEN"
+          RESP=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "https://github.com")
+          OWNER=$(jq -r '.owner.login // empty' <<< "$RESP")
+
+          if [ -z "$OWNER" ]; then
+            echo "Errore API GitHub: $(jq -r '.message // "Risposta non valida"' <<< "$RESP")"
             exit 1
           fi
+
           payload='{"files":{}}'
           indice=""
           for file in output_m3u8/*.m3u8; do
@@ -82,16 +97,18 @@ jobs:
             fi
             nome=$(basename "$file")
             payload=$(jq --arg n "$nome" --rawfile c "$file" '.files[$n] = {content: $c}' <<< "$payload")
-            indice+="https://gist.githubusercontent.com/$OWNER/$GIST_ID/raw/$nome"$'\n'
+            indice+="https://githubusercontent.com"$'\n'
           done
+
           if [ -z "$indice" ]; then
             echo "::warning::Nessuna lista con voci: non pubblico e lascio il Gist com'è"
             exit 0
           fi
+
           payload=$(jq --arg c "$indice" '.files["indice.txt"] = {content: $c}' <<< "$payload")
           printf '%s' "$payload" | curl -sS -f -X PATCH \
             -H "$AUTH" -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/gists/$GIST_ID" -d @- > /dev/null
+            "https://github.com" -d @- > /dev/null
           echo "Indice pubblicato:"
           printf '%s' "$indice"
 
