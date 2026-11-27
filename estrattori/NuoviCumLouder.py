@@ -13,14 +13,9 @@ NOME_LISTA = "NuoviCumLoude"
 # INSERISCI GLI URL DELLE PAGINE DA SCANSIONARE.
 # DOPO IL PRIMO GIRO COMPLETO, LASCIA SOLO LA PAGINA 1 PER VELOCIZZARE.
 pagine_indice = [
-    "https://www.cumlouder.com/es/4/",
-    "https://www.cumlouder.com/es/5/",
-    "https://www.cumlouder.com/es/6/",
-    "https://www.cumlouder.com/es/7/",
-    "https://www.cumlouder.com/es/8/",
-    "https://www.cumlouder.com/es/9/",
-    "https://www.cumlouder.com/es/10/",
-    "https://www.cumlouder.com/es/11/",
+    "https://www.cumlouder.com/es/",
+    "https://www.cumlouder.com/es/2/",
+    "https://www.cumlouder.com/es/3/",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
@@ -138,8 +133,12 @@ pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+
 pat_m3u8 = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
 
 
+# Scarta i link legati a IP, cookie di sessione (v-acctoken) o scadenze brevi
+PAT_BLOCCO_IP_TOKEN = re.compile(r'(?:v-acctoken=|exp_time=|expires=|[?&]ip=|[?&]asn=)', re.IGNORECASE)
+
+
 def risolvi_redirect_se_necessario(url_flusso, referer):
-    """Segue i redirect /get_file/ fino all'URL finale solo se non introduce scadenze brevi o blocchi IP."""
+    """Segue i redirect /get_file/ fino all'URL finale solo se non introduce blocchi IP o scadenze."""
     if "/get_file/" not in url_flusso:
         return url_flusso
     try:
@@ -152,7 +151,7 @@ def risolvi_redirect_se_necessario(url_flusso, referer):
         )
         r.close()
         if r.status_code in (200, 206) and r.url:
-            if not re.search(r'(?:exp_time=|expires=|ip=)', r.url, re.IGNORECASE):
+            if not PAT_BLOCCO_IP_TOKEN.search(r.url):
                 return r.url
     except Exception:
         pass
@@ -160,6 +159,9 @@ def risolvi_redirect_se_necessario(url_flusso, referer):
 
 
 def verifica_link_reale(url_flusso, referer):
+    if PAT_BLOCCO_IP_TOKEN.search(url_flusso):
+        return False
+
     try:
         if ".m3u8" in url_flusso.lower():
             r = session.get(url_flusso, headers={"User-Agent": USER_AGENT, "Referer": referer}, timeout=10)
@@ -175,6 +177,18 @@ def verifica_link_reale(url_flusso, referer):
         out = res.stdout
         if "codec_type=video" not in out:
             return False
+
+        for riga in out.splitlines():
+            if riga.startswith("duration="):
+                val = riga.split("=", 1).strip()
+                if val and val != "N/A":
+                    durata = float(val)
+                    if 0 < durata < DURATA_MINIMA_SECONDI:
+                        return False
+        return True
+    except Exception:
+        return False
+
 
         # Scarta i video con durata dichiarata > 0 ma inferiore a DURATA_MINIMA_SECONDI (180s)
         for riga in out.splitlines():
