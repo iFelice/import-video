@@ -15,12 +15,13 @@ NOME_LISTA = "NuoviH69"
 pagine_indice = [
     "https://horny69.com/videos?",
     "https://horny69.com/videos?page=2",
+    "https://horny69.com/videos?page=3",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
 # OPZIONALE: INSERISCI UN NOME FISSO PER IL GRUPPO SU SMART TV (es. "I Miei Cartoni").
 # LASCIA "" (VUOTO) SE VUOI CHE IL NOME VENGA RICAVATO IN AUTOMATICO DALL'URL.
-GRUPPO_FISSO = "NUOVIH69"
+GRUPPO_FISSO = "NUOVI H69"
 
 # INSERISCI I SITI ALTERNATIVI USANDO {query} AL POSTO DEL TERMINE DI RICERCA.
 # LASCIA LA LISTA VUOTA [] SE NON VUOI USARE SITI ALTERNATIVI.
@@ -34,7 +35,7 @@ SITI_ALTERNATIVI = [
 # ==============================================================================
 
 
-FILE_STORICO = f"archivio_storico/storico_{NOME_LISTA}.txt"
+ILE_STORICO = f"archivio_storico/storico_{NOME_LISTA}.txt"
 FILE_MANCANTI = f"da_recuperare/{NOME_LISTA}.txt"
 FILE_RECUPERATI = f"recuperati/{NOME_LISTA}.txt"
 FILE_PLAYLIST = f"output_m3u8/{NOME_LISTA}.m3u8"
@@ -133,12 +134,8 @@ pat_srv = re.compile(r'([A-Z0-9_]*SERVER[A-Z0-9_]*)\s*=\s*["\'](https?://[^"\']+
 pat_m3u8 = re.compile(r'["\'](https?://[^"\']+\.(?:m3u8|mp4)[^"\']*)["\']', re.IGNORECASE)
 
 
-# Scarta i link legati a IP, cookie di sessione (v-acctoken) o scadenze brevi
-PAT_BLOCCO_IP_TOKEN = re.compile(r'(?:v-acctoken=|exp_time=|expires=|[?&]ip=|[?&]asn=)', re.IGNORECASE)
-
-
 def risolvi_redirect_se_necessario(url_flusso, referer):
-    """Segue i redirect /get_file/ fino all'URL finale solo se non introduce blocchi IP o scadenze."""
+    """Segue i redirect /get_file/ fino all'URL finale solo se non introduce scadenze brevi o blocchi IP."""
     if "/get_file/" not in url_flusso:
         return url_flusso
     try:
@@ -151,7 +148,7 @@ def risolvi_redirect_se_necessario(url_flusso, referer):
         )
         r.close()
         if r.status_code in (200, 206) and r.url:
-            if not PAT_BLOCCO_IP_TOKEN.search(r.url):
+            if not re.search(r'(?:exp_time=|expires=|ip=)', r.url, re.IGNORECASE):
                 return r.url
     except Exception:
         pass
@@ -159,58 +156,55 @@ def risolvi_redirect_se_necessario(url_flusso, referer):
 
 
 def verifica_link_reale(url_flusso, referer):
-    if PAT_BLOCCO_IP_TOKEN.search(url_flusso):
-        print(f"      [SCARTO-TOKEN] Link bloccato da filtro token/IP", flush=True)
-        return False
-
+    """Ritorna 'ok', 'corto' o 'errore'.
+    - 'ok': video valido e di durata >= DURATA_MINIMA_SECONDI (o durata non determinabile)
+    - 'corto': video valido ma di durata < DURATA_MINIMA_SECONDI
+    - 'errore': flusso non valido, non raggiungibile o non verificabile
+    """
     try:
         if ".m3u8" in url_flusso.lower():
             r = session.get(url_flusso, headers={"User-Agent": USER_AGENT, "Referer": referer}, timeout=10)
             if r.status_code != 200 or "#EXTM3U" not in r.text[:200]:
-                print(f"      [SCARTO-M3U8] HTTP {r.status_code} o header non valido", flush=True)
-                return False
+                return "errore"
+            # Prova a calcolare la durata direttamente dalla media playlist HLS (somma degli EXTINF).
+            totale, ha_extinf = 0.0, False
+            for riga in r.text.splitlines():
+                if riga.startswith("#EXTINF:"):
+                    ha_extinf = True
+                    try:
+                        totale += float(riga.split(":", 1)[1].split(",")[0])
+                    except ValueError:
+                        pass
+            if ha_extinf:
+                return "corto" if totale < DURATA_MINIMA_SECONDI else "ok"
+            # Se è una master playlist, non possiamo sommare: si passa a ffprobe.
+
         cmd = [
             "ffprobe", "-v", "error", "-user_agent", USER_AGENT,
             "-headers", f"Referer: {referer}\r\n",
             "-show_entries", "format=duration:stream=codec_type",
-            "-of", "default=noprint_wrappers=1", url_flusso
+            "-of", "default=noprint_wrappers=1", url_flusso,
         ]
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
         out = res.stdout
         if "codec_type=video" not in out:
-            err = res.stderr.strip().splitlines() if res.stderr.strip() else "nessun flusso video"
-            print(f"      [SCARTO-FFPROBE] {err}", flush=True)
-            return False
+            return "errore"
 
+        durata = None
         for riga in out.splitlines():
             if riga.startswith("duration="):
-                val = riga.split("=", 1).strip()
+                val = riga.split("=", 1)[1].strip()
                 if val and val != "N/A":
                     durata = float(val)
-                    if 0 < durata < DURATA_MINIMA_SECONDI:
-                        print(f"      [SCARTO-DURATA] Troppo corto: {durata}s < {DURATA_MINIMA_SECONDI}s", flush=True)
-                        return False
-        return True
-    except Exception as e:
-        print(f"      [SCARTO-ERRORE] {type(e).__name__}: {e}", flush=True)
-        return False
-
-        # Scarta i video con durata dichiarata > 0 ma inferiore a DURATA_MINIMA_SECONDI (180s)
-        for riga in out.splitlines():
-            if riga.startswith("duration="):
-                val = riga.split("=", 1).strip()
-                if val and val != "N/A":
-                    durata = float(val)
-                    if 0 < durata < DURATA_MINIMA_SECONDI:
-                        return False
-        return True
+        if durata is not None and 0 < durata < DURATA_MINIMA_SECONDI:
+            return "corto"
+        return "ok"
     except Exception:
-        return False
+        return "errore"
 
 
 def trova_server(html_text, soup_video, url_pagina):
     candidati, visti = [], set()
-    print(f"   -> Trovati {len(candidati)} candidati nella pagina ({[c for c in candidati]})", flush=True)
     for nome, link in pat_srv.findall(html_text):
         if link not in visti:
             candidati.append((nome, link))
@@ -225,9 +219,14 @@ def trova_server(html_text, soup_video, url_pagina):
             visti.add(link)
     for nome, link in candidati:
         link_risolto = risolvi_redirect_se_necessario(link, url_pagina)
-        if verifica_link_reale(link_risolto, url_pagina):
-            return nome, link_risolto
-    return None, None
+        esito = verifica_link_reale(link_risolto, url_pagina)
+        if esito == "ok":
+            return nome, link_risolto, "ok"
+        if esito == "corto":
+            # Inutile provare altri server: il video è corto su qualsiasi flusso.
+            return nome, link_risolto, "corto"
+    return None, None, "errore"
+
 
 def cerca_con_playwright(page, titolo_ricerca):
     query = quote_plus(titolo_ricerca)
@@ -259,17 +258,21 @@ def cerca_con_playwright(page, titolo_ricerca):
                 except Exception:
                     pass
             page.remove_listener("response", on_resp)
-            if flusso and verifica_link_reale(flusso, primo):
-                return dom, flusso, primo
+            if flusso:
+                esito = verifica_link_reale(flusso, primo)
+                if esito == "ok":
+                    return dom, flusso, primo, "ok"
+                if esito == "corto":
+                    return dom, flusso, primo, "corto"
         except Exception as e:
             print(f"   -> Errore su {dom}: {e}")
-    return None, None, None
+    return None, None, None, "errore"
+
 nuovi_video, mancanti = [], []
 
 with sync_playwright() as p:
     browser = None
     page = None
-    uso_browser = 0
     try:
         for url_video, pag_orig, tvg_id, logo_url, gruppo in nuovi_link:
             try:
@@ -282,50 +285,48 @@ with sync_playwright() as p:
                     if og and og.get("content"):
                         logo_url = og["content"]
 
-                srv, link_ok = trova_server(res.text, soup_v, url_video)
+                srv, link_ok, esito = trova_server(res.text, soup_v, url_video)
+
+                # Video scartato subito perché troppo corto: niente fallback, niente da_recuperare,
+                # ma lo marchiamo come già visto per non ritestarlo nelle esecuzioni successive.
+                if esito == "corto":
+                    print(f"[SCARTATO <{DURATA_MINIMA_SECONDI}s] {url_video} (Titolo: {titolo})")
+                    gia_estratti.add(url_video)
+                    time.sleep(random.uniform(1.0, 2.0))
+                    continue
+
                 ref_vlc = url_video if link_ok else None
 
                 if not link_ok and SITI_ALTERNATIVI:
-                    # Riavvia Chromium ogni 15 video di fallback per non saturare la RAM
-                    if browser is None or uso_browser >= 15:
-                        if browser:
-                            try:
-                                browser.close()
-                            except Exception:
-                                pass
+                    if browser is None:
                         browser = p.chromium.launch(headless=True)
                         page = browser.new_context(user_agent=USER_AGENT).new_page()
-                        uso_browser = 0
-                    uso_browser += 1
-
                     tit_clean = pulisci_titolo_per_ricerca(titolo)
-                    print(f"[FALLBACK] '{tit_clean}' -> Uso Playwright...", flush=True)
-                    dom, link_ok, ref_vlc = cerca_con_playwright(page, tit_clean)
+                    print(f"[FALLBACK] '{tit_clean}' -> Uso Playwright...")
+                    dom, link_ok, ref_vlc, esito_alt = cerca_con_playwright(page, tit_clean)
+                    if esito_alt == "corto":
+                        print(f"[SCARTATO <{DURATA_MINIMA_SECONDI}s] {url_video} (Titolo: {titolo})")
+                        gia_estratti.add(url_video)
+                        time.sleep(random.uniform(1.0, 2.0))
+                        continue
                     if link_ok:
                         srv = f"ALT:{dom}"
 
                 if link_ok:
                     nuovi_video.append((tvg_id, logo_url, gruppo, titolo, link_ok, ref_vlc))
-                    print(f"[OK - {srv}] [{gruppo}] {tvg_id} | {titolo}", flush=True)
+                    print(f"[OK - {srv}] [{gruppo}] {tvg_id} | {titolo}")
                     gia_estratti.add(url_video)
                 else:
                     mancanti.append((gruppo, logo_url, titolo, url_video))
-                    print(f"[FALLITO OVUNQUE] {url_video} (Titolo: {titolo})", flush=True)
+                    print(f"[FALLITO OVUNQUE] {url_video} (Titolo: {titolo})")
 
                 time.sleep(random.uniform(1.5, 2.5))
             except Exception as e:
-                print(f"Errore su {url_video}: {type(e).__name__}: {e}", flush=True)
-    except Exception as exc:
-        import traceback
-        print(f"Errore critico nello script: {type(exc).__name__}: {exc}", flush=True)
-        traceback.print_exc()
-        raise
+                print(f"Errore su {url_video}: {e}")
     finally:
         if browser:
-            try:
-                browser.close()
-            except Exception:
-                pass
+            browser.close()
+
 with open(FILE_STORICO, "w", encoding="utf-8") as f:
     for u in sorted(gia_estratti):
         f.write(f"{u}\n")
@@ -408,6 +409,6 @@ if os.path.exists(FILE_RECUPERATI):
         with open(FILE_RECUPERATI, "w", encoding="utf-8") as f_rec:
             f_rec.write(f"# Incolla qui le righe da {FILE_MANCANTI} aggiungendo | LINK: https://...mp4\n")
 
-        print(f"Importati {aggiunti_manuali} video recuperati manualmente!", flush=True)
+        print(f"Importati {aggiunti_manuali} video recuperati manualmente!")
 
-print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.", flush=True)
+print(f"\nFatto! Aggiunti {len(nuovi_video)} nuovi video a '{FILE_PLAYLIST}'.")
