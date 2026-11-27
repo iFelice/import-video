@@ -13,7 +13,9 @@ NOME_LISTA = "NuoviOk"
 # INSERISCI GLI URL DELLE PAGINE DA SCANSIONARE.
 # DOPO IL PRIMO GIRO COMPLETO, LASCIA SOLO LA PAGINA 1 PER VELOCIZZARE.
 pagine_indice = [
+    "https://ok.xxx/",
     "https://ok.xxx/2/",
+    "https://ok.xxx/3/",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
