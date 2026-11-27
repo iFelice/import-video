@@ -71,7 +71,7 @@ jobs:
           git rebase -X ours origin/main
           git push origin HEAD:main
 
-      - name: Pubblica liste e indice sul Gist
+           - name: Pubblica liste e indice sul Gist
         env:
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ vars.GIST_ID }}
