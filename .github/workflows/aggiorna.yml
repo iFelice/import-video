@@ -83,13 +83,16 @@ jobs:
           API_HOST="api.github.com"
           RAW_HOST="gist.githubusercontent.com"
           GIST_API_URL="https://${API_HOST}/gists/${GIST_ID}"
-
           AUTH="Authorization: Bearer $GIST_TOKEN"
-          RESP=$(curl -sS -H "$AUTH" -H "Accept: application/vnd.github+json" "$GIST_API_URL")
-          OWNER=$(jq -r '.owner.login // empty' <<< "$RESP")
-
+          CODE=$(curl -sS -o resp.json -w '%{http_code}' -H "$AUTH" -H "Accept: application/vnd.github+json" "$GIST_API_URL")
+          echo "Risposta HTTP: $CODE"
+          if [ "$CODE" != "200" ]; then
+            echo "Errore API GitHub: $(jq -r '.message // "nessun messaggio"' resp.json 2>/dev/null || echo 'risposta non JSON')"
+            exit 1
+          fi
+          OWNER=$(jq -r '.owner.login // empty' resp.json)
           if [ -z "$OWNER" ]; then
-            echo "Errore API GitHub: $(jq -r '.message // "Risposta non valida"' <<< "$RESP")"
+            echo "Il Gist non ha un proprietario: è stato creato senza accesso?"
             exit 1
           fi
 
