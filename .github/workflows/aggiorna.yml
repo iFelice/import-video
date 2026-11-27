@@ -60,8 +60,8 @@ jobs:
       - name: Salva playlist e storici aggiornati
         run: |
           mkdir -p archivio_storico da_recuperare recuperati output_m3u8
-          git config --local user.email "41898282+github-actions[bot]@://github.com"
-          git config --local user.name "github-actions[bot]"
+          GH_HOST="github.com"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.${GH_HOST}"
           git add -A output_m3u8/ archivio_storico/ da_recuperare/ recuperati/
 
           git diff --cached --quiet && exit 0
