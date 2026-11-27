@@ -14,14 +14,6 @@ NOME_LISTA = "NuoviOk"
 # DOPO IL PRIMO GIRO COMPLETO, LASCIA SOLO LA PAGINA 1 PER VELOCIZZARE.
 pagine_indice = [
     "https://ok.xxx",
-    "https://ok.xxx/2/",
-    "https://ok.xxx/4/",
-    "https://ok.xxx/5/",
-    "https://ok.xxx/6/",
-    "https://ok.xxx/7/",
-    "https://ok.xxx/8/",
-    "https://ok.xxx/9/",
-    "https://ok.xxx/10/",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
