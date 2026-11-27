@@ -15,7 +15,6 @@ NOME_LISTA = "NuoviCumLoude"
 pagine_indice = [
     "https://www.cumlouder.com/es/",
     "https://www.cumlouder.com/es/2/",
-    "https://www.cumlouder.com/es/3/",
     # "https://INSERISCI_SITO_://principale.com&page=2",
 ]
 
