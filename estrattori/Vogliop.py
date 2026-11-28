@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 # ==============================================================================
 
 # INSERISCI IL NOME IDENTIFICATIVO DELLA LISTA (es. "aldo", "bruno", "cartoni")
-NOME_LISTA = "INSERISCI_NOME_LISTA_QUI"
+NOME_LISTA = "VoglioP"
 
 # INSERISCI GLI URL DELLE PAGINE DA SCANSIONARE.
 # DOPO IL PRIMO GIRO COMPLETO, LASCIA SOLO LA PAGINA 1 PER VELOCIZZARE.
