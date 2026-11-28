@@ -23,6 +23,9 @@ pagine_indice = [
 # LASCIA "" (VUOTO) SE VUOI CHE IL NOME VENGA RICAVATO IN AUTOMATICO DALL'URL.
 GRUPPO_FISSO = "NUOVI CUMLOUDER"
 
+# DURATA MINIMA IN SECONDI PER SCARTARE SPOT E ANTEPRIME (180 = 3 MINUTI)
+DURATA_MINIMA_SECONDI = 180
+
 # INSERISCI I SITI ALTERNATIVI USANDO {query} AL POSTO DEL TERMINE DI RICERCA.
 # LASCIA LA LISTA VUOTA [] SE NON VUOI USARE SITI ALTERNATIVI.
 SITI_ALTERNATIVI = [
@@ -96,6 +99,8 @@ if os.path.exists(FILE_MANCANTI):
                 if url_orig:
                     da_saltare.add(url_orig)
 
+nuovi_link, link_visti = [], set()
+
 for idx_pag, pagina in enumerate(pagine_indice, start=1):
     try:
         parsed = urlparse(pagina)
@@ -106,28 +111,20 @@ for idx_pag, pagina in enumerate(pagine_indice, start=1):
         soup = BeautifulSoup(risposta.text, "html.parser")
         trovati = 0
         for link in soup.find_all("a", href=True):
-            href_orig = link["href"].strip()
-            # Scarta ancoraggi, javascript, mailto e link vuoti
-            if not href_orig or href_orig.startswith(("#", "javascript:", "mailto:")):
-                continue
-            # Se PATTERN_HREF è impostato, accetta solo link che lo matchano
-            if PATTERN_HREF and not re.search(PATTERN_HREF, href_orig):
-                continue
             img_tag = link.find("img")
-            raw_logo = ""
             if img_tag:
-                raw_logo = (img_tag.get("data-src") or img_tag.get("data-original")
-                            or img_tag.get("data-lazy-src") or img_tag.get("src") or "")
+                raw_logo = img_tag.get("data-src") or img_tag.get("data-original") or img_tag.get("src") or ""
                 if "favicon" in raw_logo.lower() or "graphics/" in raw_logo.lower():
                     continue
-            url_completo = urljoin(pagina, href_orig) if href_orig.startswith("..") else urljoin(base_url, href_orig.lstrip("/"))
-            if url_completo.rstrip("/") == base_url.rstrip("/"):
-                continue
-            if url_completo not in da_saltare and url_completo not in link_visti:
-                link_visti.add(url_completo)
-                trovati += 1
-                logo_url = urljoin(pagina, raw_logo) if raw_logo and not raw_logo.startswith("data:") else ""
-                nuovi_link.append((url_completo, pagina, f"p{idx_pag}v{trovati}", logo_url, gruppo_cat))
+                href_orig = link["href"].strip()
+                url_completo = urljoin(pagina, href_orig) if href_orig.startswith("..") else urljoin(base_url, href_orig.lstrip("/"))
+                if url_completo.rstrip("/") == base_url.rstrip("/"):
+                    continue
+                if url_completo not in da_saltare and url_completo not in link_visti:
+                    link_visti.add(url_completo)
+                    trovati += 1
+                    logo_url = urljoin(pagina, raw_logo) if raw_logo and not raw_logo.startswith("data:") else ""
+                    nuovi_link.append((url_completo, pagina, f"p{idx_pag}v{trovati}", logo_url, gruppo_cat))
         print(f" -> Nuovi link trovati: {trovati}")
         if idx_pag < len(pagine_indice):
             time.sleep(random.uniform(2.0, 3.5))
