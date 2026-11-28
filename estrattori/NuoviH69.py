@@ -23,6 +23,10 @@ pagine_indice = [
 # LASCIA "" (VUOTO) SE VUOI CHE IL NOME VENGA RICAVATO IN AUTOMATICO DALL'URL.
 GRUPPO_FISSO = "NUOVI H69"
 
+# DURATA MINIMA IN SECONDI PER SCARTARE SPOT E ANTEPRIME (300 = 5 MINUTI)
+DURATA_MINIMA_SECONDI = 300
+# PATTERN PER ACCETTARE SOLO LINK CHE MATCHANO (es. r'/videos/'). Vuoto = nessun filtro.
+PATTERN_HREF = r'/videos/'
 # INSERISCI I SITI ALTERNATIVI USANDO {query} AL POSTO DEL TERMINE DI RICERCA.
 # LASCIA LA LISTA VUOTA [] SE NON VUOI USARE SITI ALTERNATIVI.
 SITI_ALTERNATIVI = [
@@ -33,7 +37,6 @@ SITI_ALTERNATIVI = [
 # ==============================================================================
 # 2. PERCORSI AUTOMATICI (NON SERVE MODIFICARLI SE USI NOME_LISTA QUI SOPRA)
 # ==============================================================================
-
 
 FILE_STORICO = f"archivio_storico/storico_{NOME_LISTA}.txt"
 FILE_MANCANTI = f"da_recuperare/{NOME_LISTA}.txt"
@@ -96,6 +99,8 @@ if os.path.exists(FILE_MANCANTI):
                 url_orig = riga.split("ORIGINE:", 1)[1].split("|")[0].strip()
                 if url_orig:
                     da_saltare.add(url_orig)
+
+nuovi_link, link_visti = [], set()
 
 for idx_pag, pagina in enumerate(pagine_indice, start=1):
     try:
@@ -168,11 +173,11 @@ def verifica_link_reale(url_flusso, referer):
     - 'errore': flusso non valido, non raggiungibile o non verificabile
     """
     try:
+        # HLS: calcola durata dal manifest (veloce, niente ffprobe)
         if ".m3u8" in url_flusso.lower():
             r = session.get(url_flusso, headers={"User-Agent": USER_AGENT, "Referer": referer}, timeout=10)
             if r.status_code != 200 or "#EXTM3U" not in r.text[:200]:
                 return "errore"
-            # Prova a calcolare la durata direttamente dalla media playlist HLS (somma degli EXTINF).
             totale, ha_extinf = 0.0, False
             for riga in r.text.splitlines():
                 if riga.startswith("#EXTINF:"):
@@ -183,19 +188,38 @@ def verifica_link_reale(url_flusso, referer):
                         pass
             if ha_extinf:
                 return "corto" if totale < DURATA_MINIMA_SECONDI else "ok"
-            # Se è una master playlist, non possiamo sommare: si passa a ffprobe.
+            # master playlist: si passa a ffprobe sotto
 
+        # MP4 diretto: HEAD, niente ffprobe (troppo lento su file grossi)
+        if ".mp4" in url_flusso.lower():
+            h = session.head(url_flusso,
+                             headers={"User-Agent": USER_AGENT, "Referer": referer},
+                             timeout=15, allow_redirects=True)
+            if h.status_code not in (200, 206):
+                return "errore"
+            ctype = (h.headers.get("Content-Type") or "").lower()
+            if "video" not in ctype and "octet-stream" not in ctype:
+                return "errore"
+            try:
+                size = int(h.headers.get("Content-Length") or 0)
+            except ValueError:
+                size = 0
+            # Soglia: sotto i 5 MB lo consideriamo "corto" (spot/anteprima)
+            if 0 < size < 5 * 1024 * 1024:
+                return "corto"
+            return "ok"
+
+        # Fallback: ffprobe con timeout generoso (master HLS o formati sconosciuti)
         cmd = [
             "ffprobe", "-v", "error", "-user_agent", USER_AGENT,
             "-headers", f"Referer: {referer}\r\n",
             "-show_entries", "format=duration:stream=codec_type",
             "-of", "default=noprint_wrappers=1", url_flusso,
         ]
-        res = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
         out = res.stdout
         if "codec_type=video" not in out:
             return "errore"
-
         durata = None
         for riga in out.splitlines():
             if riga.startswith("duration="):
@@ -219,6 +243,13 @@ def trova_server(html_text, soup_video, url_pagina):
     if tag_hls and tag_hls["src"] not in visti:
         candidati.append(("HLSJS_TAG", tag_hls["src"]))
         visti.add(tag_hls["src"])
+    # Tag <video> e <source> espliciti
+    for tag_name in ("video", "source"):
+        for tag in soup_video.find_all(tag_name, src=True):
+            link = tag["src"]
+            if link.startswith("http") and link not in visti:
+                candidati.append((f"TAG_{tag_name.upper()}", link))
+                visti.add(link)
     for link in pat_m3u8.findall(html_text):
         if link not in visti:
             candidati.append(("FALLBACK_M3U8", link))
@@ -229,7 +260,6 @@ def trova_server(html_text, soup_video, url_pagina):
         if esito == "ok":
             return nome, link_risolto, "ok"
         if esito == "corto":
-            # Inutile provare altri server: il video è corto su qualsiasi flusso.
             return nome, link_risolto, "corto"
     return None, None, "errore"
 
@@ -293,8 +323,7 @@ with sync_playwright() as p:
 
                 srv, link_ok, esito = trova_server(res.text, soup_v, url_video)
 
-                # Video scartato subito perché troppo corto: niente fallback, niente da_recuperare,
-                # ma lo marchiamo come già visto per non ritestarlo nelle esecuzioni successive.
+                # Video scartato subito perché troppo corto
                 if esito == "corto":
                     print(f"[SCARTATO <{DURATA_MINIMA_SECONDI}s] {url_video} (Titolo: {titolo})")
                     gia_estratti.add(url_video)
